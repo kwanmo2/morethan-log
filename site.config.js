@@ -3,11 +3,11 @@ const CONFIG = {
   profile: {
     name: "Slowbeam.dev",
     image: "/avatar.svg", // If you want to create your own notion avatar, check out https://notion-avatar.vercel.app
-    role: "frontend developer",
-    bio: "I develop everything using node.",
+    role: "Machine vision tech enginner",
+    bio: "high-precision image processing and system integration",
     email: "kwanmo2@gmail.com",
-    linkedin: "kwanmo2",
-    github: "kwanmo2",
+    linkedin: "https://www.linkedin.com/in/kwanmo-yeon-aaa0b71a5/",
+    github: "https://github.com/kwanmo2?tab=repositories",
     instagram: "",
   },
   projects: [
@@ -20,7 +20,7 @@ const CONFIG = {
   blog: {
     title: "Slowbeam.dev",
     description: "천천히, 그러나 정확하게",
-    scheme: "dark", // 'light' | 'dark' | 'system'
+    scheme: "system", // 'light' | 'dark' | 'system'
   },
 
   // CONFIG configration (required)
