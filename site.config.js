@@ -6,8 +6,8 @@ const CONFIG = {
     role: "Machine vision tech enginner",
     bio: "천천히, 그러나 정확하게",
     email: "kwanmo2@gmail.com",
-    linkedin: "https://www.linkedin.com/in/kwanmo-yeon-aaa0b71a5/",
-    github: "https://github.com/kwanmo2?tab=repositories",
+    linkedin: "kwanmo-yeon-aaa0b71a5/",
+    github: "kwanmo2?tab=repositories",
     instagram: "",
   },
   projects: [
