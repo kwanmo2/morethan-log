@@ -4,17 +4,19 @@ const CONFIG = {
     name: "Slowbeam.dev",
     image: "/avatar.svg", // If you want to create your own notion avatar, check out https://notion-avatar.vercel.app
     role: "Machine vision tech enginner",
-    bio: "high-precision image processing and system integration",
+    bio: "천천히, 그러나 정확하게",
     email: "kwanmo2@gmail.com",
     linkedin: "https://www.linkedin.com/in/kwanmo-yeon-aaa0b71a5/",
     github: "https://github.com/kwanmo2?tab=repositories",
     instagram: "",
   },
   projects: [
+    /*
     {
       name: `morethan-log`,
       href: "https://github.com/morethanmin/morethan-log",
     },
+    */
   ],
   // blog setting (required)
   blog: {
@@ -24,8 +26,8 @@ const CONFIG = {
   },
 
   // CONFIG configration (required)
-  link: "https://morethan-log.vercel.app",
-  since: 2022, // If leave this empty, current year will be used.
+  link: "https://slowbeam.vercel.app/",
+  since: 2025, // If leave this empty, current year will be used.
   lang: "en-US", // ['en-US', 'zh-CN', 'zh-HK', 'zh-TW', 'ja-JP', 'es-ES', 'ko-KR']
   ogImageGenerateURL: "https://og-image-korean.vercel.app", // The link to generate OG image, don't end with a slash
 
