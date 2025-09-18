@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useMemo } from "react"
 import PostHeader from "./PostHeader"
 import Footer from "./PostFooter"
 import CommentBox from "./CommentBox"
@@ -6,15 +6,48 @@ import Category from "src/components/Category"
 import styled from "@emotion/styled"
 import NotionRenderer from "../components/NotionRenderer"
 import usePostQuery from "src/hooks/usePostQuery"
+import useLanguage from "src/hooks/useLanguage"
+import { DEFAULT_LANGUAGE } from "src/constants/language"
+import {
+  collectPostContents,
+  selectContentByLanguage,
+} from "src/libs/utils/language"
+import { TPostBase } from "src/types"
 
 type Props = {}
 
 const PostDetail: React.FC<Props> = () => {
   const data = usePostQuery()
+  const [language] = useLanguage()
 
-  if (!data) return null
+  const contents = useMemo(
+    () => (data ? collectPostContents(data) : []),
+    [data]
+  )
 
-  const category = (data.category && data.category?.[0]) || undefined
+  const activeContent = useMemo(
+    () =>
+      data && contents.length
+        ? selectContentByLanguage(contents, language, DEFAULT_LANGUAGE)
+        : null,
+    [contents, language, data]
+  )
+
+  if (!data || !activeContent) return null
+
+  const category =
+    (activeContent.category && activeContent.category?.[0]) || undefined
+
+  const commentTarget: TPostBase = {
+    ...activeContent,
+    id: data.id,
+    slug: data.slug,
+    status: data.status,
+    type: activeContent.type,
+    date: activeContent.date ?? data.date,
+    createdTime: activeContent.createdTime || data.createdTime,
+    fullWidth: activeContent.fullWidth,
+  }
 
   return (
     <StyledWrapper>
@@ -26,14 +59,14 @@ const PostDetail: React.FC<Props> = () => {
             </Category>
           </div>
         )}
-        {data.type[0] === "Post" && <PostHeader data={data} />}
+        {activeContent.type[0] === "Post" && <PostHeader data={activeContent} />}
         <div>
-          <NotionRenderer recordMap={data.recordMap} />
+          <NotionRenderer recordMap={activeContent.recordMap} />
         </div>
-        {data.type[0] === "Post" && (
+        {activeContent.type[0] === "Post" && (
           <>
             <Footer />
-            <CommentBox data={data} />
+            <CommentBox data={commentTarget} />
           </>
         )}
       </article>

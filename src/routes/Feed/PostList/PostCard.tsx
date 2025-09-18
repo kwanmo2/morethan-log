@@ -2,13 +2,13 @@ import Link from "next/link"
 import { CONFIG } from "site.config"
 import { formatDate } from "src/libs/utils"
 import Tag from "../../../components/Tag"
-import { TPost } from "../../../types"
+import { TPostBase } from "../../../types"
 import Image from "next/image"
 import Category from "../../../components/Category"
 import styled from "@emotion/styled"
 
 type Props = {
-  data: TPost
+  data: TPostBase
 }
 
 const PostCard: React.FC<Props> = ({ data }) => {

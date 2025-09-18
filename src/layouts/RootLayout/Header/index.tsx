@@ -1,6 +1,7 @@
 import NavBar from "./NavBar"
 import Logo from "./Logo"
 import ThemeToggle from "./ThemeToggle"
+import LanguageToggle from "./LanguageToggle"
 import styled from "@emotion/styled"
 import { zIndexes } from "src/styles/zIndexes"
 
@@ -14,6 +15,7 @@ const Header: React.FC<Props> = ({ fullWidth }) => {
       <div data-full-width={fullWidth} className="container">
         <Logo />
         <div className="nav">
+          <LanguageToggle />
           <ThemeToggle />
           <NavBar />
         </div>

@@ -48,7 +48,7 @@ const PostList: React.FC<Props> = ({ q }) => {
 
       return newFilteredPosts
     })
-  }, [q, currentTag, currentCategory, currentOrder, setFilteredPosts])
+  }, [data, q, currentTag, currentCategory, currentOrder, setFilteredPosts])
 
   return (
     <>

@@ -1,8 +1,8 @@
 import { DEFAULT_CATEGORY } from "src/constants"
-import { TPost } from "src/types"
+import { TPostBase } from "src/types"
 
 interface FilterPostsParams {
-  posts: TPost[]
+  posts: TPostBase[]
   q: string
   tag?: string
   category?: string
@@ -15,7 +15,7 @@ export function filterPosts({
   tag = undefined,
   category = DEFAULT_CATEGORY,
   order = "desc",
-}: FilterPostsParams): TPost[] {
+}: FilterPostsParams): TPostBase[] {
   return posts
     .filter((post) => {
       const tagContent = post.tags ? post.tags.join(" ") : ""

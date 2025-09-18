@@ -1,4 +1,4 @@
-import { TPost } from "src/types"
+import { TPostBase } from "src/types"
 import { CONFIG } from "site.config"
 import dynamic from "next/dynamic"
 
@@ -16,7 +16,7 @@ const CusdisComponent = dynamic(
 )
 
 type Props = {
-  data: TPost
+  data: Pick<TPostBase, "id" | "slug" | "title">
 }
 
 const CommentBox: React.FC<Props> = ({ data }) => {
