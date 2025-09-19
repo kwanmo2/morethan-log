@@ -80,10 +80,12 @@ export const availableLanguagesFromContents = (contents: PostContent[]) => {
   )
 }
 
-export const sanitizePostBase = (post: TPostBase): TPostBase => ({
-  ...post,
-  translations: undefined,
-})
+type PostWithOptionalTranslations = TPostBase & { translations?: TPostBase[] }
+
+export const sanitizePostBase = (post: PostWithOptionalTranslations): TPostBase => {
+  const { translations: _translations, ...rest } = post
+  return rest
+}
 
 export const selectPostBaseByLanguage = (
   post: TPost,
