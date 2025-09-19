@@ -4,6 +4,7 @@ import { getCookie, setCookie } from "cookies-next"
 import { useEffect } from "react"
 import { DEFAULT_LANGUAGE } from "src/constants/language"
 import { queryKey } from "src/constants/queryKey"
+import { deriveDefaultLanguage } from "src/libs/utils/language"
 
 type SetLanguage = (language: string) => void
 
@@ -30,7 +31,23 @@ const useLanguage = (): [string, SetLanguage] => {
     if (typeof window === "undefined") return
 
     const cachedLanguage = getCookie(LANGUAGE_COOKIE_KEY) as string | undefined
-    setLanguage(cachedLanguage || DEFAULT_LANGUAGE)
+    if (cachedLanguage) {
+      setLanguage(cachedLanguage)
+      return
+    }
+
+    const availableLanguages =
+      Array.isArray(navigator.languages) && navigator.languages.length > 0
+        ? navigator.languages
+        : navigator.language
+        ? [navigator.language]
+        : []
+
+    const normalizedLanguage = availableLanguages
+      .map((language) => deriveDefaultLanguage(language))
+      .find((language) => language === "ko" || language === "en")
+
+    setLanguage(normalizedLanguage ?? DEFAULT_LANGUAGE)
   }, [setLanguage])
 
   return [data ?? DEFAULT_LANGUAGE, setLanguage]
