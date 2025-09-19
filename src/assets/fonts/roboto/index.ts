@@ -1,7 +1,9 @@
-import { Roboto } from 'next/font/google'
+const robotoFontStack = '"Roboto", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
 
-export const roboto = Roboto({
-  weight: ['900'],
-  style: ['italic'],
-  subsets: ['latin'],
-})
+export const roboto = {
+  style: {
+    fontFamily: robotoFontStack,
+    fontWeight: "900" as const,
+    fontStyle: "italic" as const,
+  },
+}
