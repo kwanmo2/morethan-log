@@ -15,7 +15,7 @@ export type AppPropsWithLayout = AppProps & {
 export type TPostStatus = "Private" | "Public" | "PublicOnDetail"
 export type TPostType = "Post" | "Paper" | "Page"
 
-export type TPost = {
+export type TPostBase = {
   id: string
   date: { start_date: string }
   type: TPostType[]
@@ -33,10 +33,19 @@ export type TPost = {
   createdTime: string
   fullWidth: boolean
   thumbnail?: string
+  language?: string[]
 }
 
-export type PostDetail = TPost & {
+export type TPost = TPostBase & {
+  translations?: TPostBase[]
+}
+
+export type PostContent = TPostBase & {
   recordMap: ExtendedRecordMap
+}
+
+export type PostDetail = PostContent & {
+  translations?: PostContent[]
 }
 
 export type TPosts = TPost[]

@@ -1,8 +1,8 @@
-import { TPosts } from "src/types"
+import { TPostBase } from "src/types"
 
 export function getAllSelectItemsFromPosts(
   key: "tags" | "category",
-  posts: TPosts
+  posts: TPostBase[]
 ) {
   const selectedPosts = posts.filter((post) => post?.[key])
   const items = [...selectedPosts.map((p) => p[key]).flat()]

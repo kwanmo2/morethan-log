@@ -7,11 +7,13 @@ import { queryClient } from "src/libs/react-query"
 import { queryKey } from "src/constants/queryKey"
 import { GetStaticProps } from "next"
 import { dehydrate } from "@tanstack/react-query"
-import { filterPosts } from "src/libs/utils/notion"
+import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
+import { DEFAULT_LANGUAGE } from "src/constants/language"
 
 export const getStaticProps: GetStaticProps = async () => {
   const posts = filterPosts(await getPosts())
-  await queryClient.prefetchQuery(queryKey.posts(), () => posts)
+  const mergedPosts = mergePostsByLanguage(posts, DEFAULT_LANGUAGE)
+  await queryClient.prefetchQuery(queryKey.posts(), () => mergedPosts)
 
   return {
     props: {

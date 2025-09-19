@@ -1,5 +1,5 @@
 import Detail from "src/routes/Detail"
-import { filterPosts } from "src/libs/utils/notion"
+import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
 import { CONFIG } from "site.config"
 import { NextPageWithLayout } from "../types"
 import CustomError from "src/routes/Error"
@@ -11,6 +11,12 @@ import { queryKey } from "src/constants/queryKey"
 import { dehydrate } from "@tanstack/react-query"
 import usePostQuery from "src/hooks/usePostQuery"
 import { FilterPostsOptions } from "src/libs/utils/notion/filterPosts"
+import { DEFAULT_LANGUAGE } from "src/constants/language"
+import useLanguage from "src/hooks/useLanguage"
+import {
+  collectPostContents,
+  selectContentByLanguage,
+} from "src/libs/utils/language"
 
 const filter: FilterPostsOptions = {
   acceptStatus: ["Public", "PublicOnDetail"],
@@ -20,28 +26,65 @@ const filter: FilterPostsOptions = {
 export const getStaticPaths = async () => {
   const posts = await getPosts()
   const filteredPost = filterPosts(posts, filter)
+  const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
 
   return {
-    paths: filteredPost.map((row) => `/${row.slug}`),
+    paths: mergedPosts.map((row) => `/${row.slug}`),
     fallback: true,
   }
 }
 
 export const getStaticProps: GetStaticProps = async (context) => {
-  const slug = context.params?.slug
+  const slugParam = context.params?.slug
+
+  if (!slugParam || Array.isArray(slugParam)) {
+    return {
+      notFound: true,
+      revalidate: CONFIG.revalidateTime,
+    }
+  }
 
   const posts = await getPosts()
-  const feedPosts = filterPosts(posts)
+  const feedPosts = mergePostsByLanguage(filterPosts(posts), DEFAULT_LANGUAGE)
   await queryClient.prefetchQuery(queryKey.posts(), () => feedPosts)
 
-  const detailPosts = filterPosts(posts, filter)
-  const postDetail = detailPosts.find((t: any) => t.slug === slug)
-  const recordMap = await getRecordMap(postDetail?.id!)
+  const detailPosts = mergePostsByLanguage(
+    filterPosts(posts, filter),
+    DEFAULT_LANGUAGE
+  )
+  const postDetail = detailPosts.find((post) => post.slug === slugParam)
 
-  await queryClient.prefetchQuery(queryKey.post(`${slug}`), () => ({
+  if (!postDetail) {
+    return {
+      notFound: true,
+      revalidate: CONFIG.revalidateTime,
+    }
+  }
+
+  const contents = [postDetail, ...(postDetail.translations ?? [])]
+
+  const recordMaps = await Promise.all(
+    contents.map((content) => getRecordMap(content.id))
+  )
+
+  const [baseRecordMap, ...translationRecordMaps] = recordMaps
+
+  const translationsWithRecordMap = (postDetail.translations ?? []).map(
+    (translation, index) => ({
+      ...translation,
+      recordMap: translationRecordMaps[index],
+    })
+  )
+
+  const hydratedPost = {
     ...postDetail,
-    recordMap,
-  }))
+    recordMap: baseRecordMap,
+    translations: translationsWithRecordMap.length
+      ? translationsWithRecordMap
+      : undefined,
+  }
+
+  await queryClient.prefetchQuery(queryKey.post(`${slugParam}`), () => hydratedPost)
 
   return {
     props: {
@@ -53,22 +96,34 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
 const DetailPage: NextPageWithLayout = () => {
   const post = usePostQuery()
+  const [language] = useLanguage()
 
   if (!post) return <CustomError />
 
+  const contents = collectPostContents(post)
+  const activeContent = selectContentByLanguage(
+    contents,
+    language,
+    DEFAULT_LANGUAGE
+  )
+
   const image =
+    activeContent.thumbnail ??
     post.thumbnail ??
     CONFIG.ogImageGenerateURL ??
-    `${CONFIG.ogImageGenerateURL}/${encodeURIComponent(post.title)}.png`
+    `${CONFIG.ogImageGenerateURL}/${encodeURIComponent(activeContent.title)}.png`
 
-  const date = post.date?.start_date || post.createdTime || ""
+  const date =
+    activeContent.date?.start_date ||
+    activeContent.createdTime ||
+    post.createdTime
 
   const meta = {
-    title: post.title,
+    title: activeContent.title,
     date: new Date(date).toISOString(),
-    image: image,
-    description: post.summary || "",
-    type: post.type[0],
+    image,
+    description: activeContent.summary || post.summary || "",
+    type: activeContent.type[0],
     url: `${CONFIG.link}/${post.slug}`,
   }
 

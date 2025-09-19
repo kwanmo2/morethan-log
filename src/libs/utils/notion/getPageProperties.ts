@@ -2,6 +2,10 @@ import { getTextContent, getDateValue } from "notion-utils"
 import { NotionAPI } from "notion-client"
 import { BlockMap, CollectionPropertySchemaMap } from "notion-types"
 import { customMapImageUrl } from "./customMapImageUrl"
+import {
+  ensureLanguageArray,
+  normalizeLanguageCode,
+} from "src/libs/utils/language"
 
 async function getPageProperties(
   id: string,
@@ -79,6 +83,28 @@ async function getPageProperties(
       }
     }
   }
+  const rawLanguage =
+    properties.language ||
+    (properties as any).Language ||
+    (properties as any).lang ||
+    (properties as any).Lang
+
+  const languageArray = ensureLanguageArray(rawLanguage)?.map((lang) =>
+    normalizeLanguageCode(lang)
+  )
+
+  if (languageArray?.length) {
+    properties.language = Array.from(
+      new Set(languageArray.filter((lang): lang is string => Boolean(lang)))
+    )
+  } else {
+    delete properties.language
+  }
+
+  delete (properties as any).Language
+  delete (properties as any).lang
+  delete (properties as any).Lang
+
   return properties
 }
 
