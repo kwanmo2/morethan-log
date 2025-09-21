@@ -42,6 +42,9 @@ Next.js static blog using Notion as a Content Management System (CMS). Supports 
    - `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` : For Google search console Plugin.
    - `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` : For Naver search advisor Plugin.
    - `NEXT_PUBLIC_UTTERANCES_REPO` : For Utterances Plugin.
+   - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` : Required for Google comment authentication.
+   - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` : Required to persist visitor statistics and comments using Upstash Redis REST API.
+   - `VISITOR_TIMEZONE` *(optional)* and `NEXT_PUBLIC_VISITOR_TIMEZONE` *(optional)* : Override the default `Asia/Seoul` timezone when aggregating visitor statistics both on the server and client.
 
 ## 10 Steps to build your own morethan-log (by 23.06.23)
 
