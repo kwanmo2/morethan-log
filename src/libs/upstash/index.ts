@@ -6,6 +6,12 @@ const hasUpstashConfig = Boolean(
 
 type Command = string[]
 
+type InMemoryRedisValue =
+  | string
+  | number
+  | null
+  | InMemoryRedisValue[]
+
 type MemoryEntry = {
   value: string
   expiresAt?: number
@@ -36,7 +42,7 @@ const normalizeResult = (input: any): any => {
   return input
 }
 
-const executeInMemory = (command: Command) => {
+const executeInMemory = (command: Command): InMemoryRedisValue => {
   const [action, ...args] = command
   const store = getMemoryStore()
 
@@ -83,7 +89,9 @@ const executeInMemory = (command: Command) => {
   }
 }
 
-export const runRedisCommand = async (command: Command) => {
+export const runRedisCommand = async (
+  command: Command,
+): Promise<InMemoryRedisValue> => {
   if (!hasUpstashConfig) {
     return executeInMemory(command)
   }
@@ -106,7 +114,9 @@ export const runRedisCommand = async (command: Command) => {
   return normalizeResult(payload.result)
 }
 
-export const runRedisPipeline = async (commands: Command[]) => {
+export const runRedisPipeline = async (
+  commands: Command[],
+): Promise<InMemoryRedisValue> => {
   if (!hasUpstashConfig) {
     return commands.map((command) => executeInMemory(command))
   }
