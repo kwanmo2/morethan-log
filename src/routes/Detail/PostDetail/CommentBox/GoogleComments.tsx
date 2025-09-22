@@ -7,6 +7,7 @@ import styled from "@emotion/styled"
 import { queryKey } from "src/constants/queryKey"
 import type { StoredComment } from "src/types/comment"
 import type { TPostBase } from "src/types"
+import useScheme from "src/hooks/useScheme"
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 const DISPLAY_TIME_ZONE =
@@ -142,6 +143,7 @@ const GoogleComments: React.FC<{ data: Pick<TPostBase, "id" | "slug" | "title"> 
   const [comment, setComment] = useState("")
   const [sdkReady, setSdkReady] = useState(false)
   const buttonRef = useRef<HTMLDivElement | null>(null)
+  const [scheme] = useScheme()
 
   const {
     data: comments = [],
@@ -179,14 +181,17 @@ const GoogleComments: React.FC<{ data: Pick<TPostBase, "id" | "slug" | "title"> 
     if (!sdkReady || user || !buttonRef.current) return
     if (!window.google?.accounts?.id) return
 
+    const theme: RenderButtonOptions["theme"] =
+      scheme === "dark" ? "filled_black" : "outline"
+
     buttonRef.current.innerHTML = ""
     window.google.accounts.id.renderButton(buttonRef.current, {
-      theme: "outline",
+      theme,
       size: "large",
       text: "signin_with",
       width: "100%",
     })
-  }, [sdkReady, user])
+  }, [sdkReady, user, scheme])
 
   const mutation = useMutation<StoredComment, Error, string>(
     async (content) => {
