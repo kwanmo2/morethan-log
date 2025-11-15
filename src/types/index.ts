@@ -34,6 +34,7 @@ export type TPostBase = {
   fullWidth: boolean
   thumbnail?: string
   language?: string[]
+  isAiTranslation?: boolean
 }
 
 export type TPost = TPostBase & {
