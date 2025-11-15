@@ -17,6 +17,10 @@ import {
   collectPostContents,
   selectContentByLanguage,
 } from "src/libs/utils/language"
+import {
+  loadAiTranslationRecordMap,
+  syncAiTranslations,
+} from "src/libs/server/aiTranslations"
 
 const filter: FilterPostsOptions = {
   acceptStatus: ["Public", "PublicOnDetail"],
@@ -25,7 +29,8 @@ const filter: FilterPostsOptions = {
 
 export const getStaticPaths = async () => {
   const posts = await getPosts()
-  const filteredPost = filterPosts(posts, filter)
+  const postsWithTranslations = await syncAiTranslations(posts)
+  const filteredPost = filterPosts(postsWithTranslations, filter)
   const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
 
   return {
@@ -45,11 +50,15 @@ export const getStaticProps: GetStaticProps = async (context) => {
   }
 
   const posts = await getPosts()
-  const feedPosts = mergePostsByLanguage(filterPosts(posts), DEFAULT_LANGUAGE)
+  const postsWithTranslations = await syncAiTranslations(posts)
+  const feedPosts = mergePostsByLanguage(
+    filterPosts(postsWithTranslations),
+    DEFAULT_LANGUAGE
+  )
   await queryClient.prefetchQuery(queryKey.posts(), () => feedPosts)
 
   const detailPosts = mergePostsByLanguage(
-    filterPosts(posts, filter),
+    filterPosts(postsWithTranslations, filter),
     DEFAULT_LANGUAGE
   )
   const postDetail = detailPosts.find((post) => post.slug === slugParam)
@@ -64,10 +73,24 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const contents = [postDetail, ...(postDetail.translations ?? [])]
 
   const recordMaps = await Promise.all(
-    contents.map((content) => getRecordMap(content.id))
+    contents.map((content) => {
+      if (content.isAiTranslation) {
+        return loadAiTranslationRecordMap(content.id)
+      }
+      return getRecordMap(content.id)
+    })
   )
 
-  const [baseRecordMap, ...translationRecordMaps] = recordMaps
+  const ensuredRecordMaps = recordMaps.map((recordMap, index) => {
+    if (!recordMap) {
+      throw new Error(
+        `Missing recordMap for ${contents[index].title}. Regenerate AI translations to continue.`
+      )
+    }
+    return recordMap
+  })
+
+  const [baseRecordMap, ...translationRecordMaps] = ensuredRecordMaps
 
   const translationsWithRecordMap = (postDetail.translations ?? []).map(
     (translation, index) => ({
