@@ -1,3 +1,5 @@
+"use client"
+
 import { useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getCookie, setCookie } from "cookies-next"

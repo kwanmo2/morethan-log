@@ -1,5 +1,7 @@
+"use client"
+
 import styled from "@emotion/styled"
-import { useRouter } from "next/router"
+import { useRouter } from "next/navigation"
 import React from "react"
 
 type Props = {}

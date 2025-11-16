@@ -1,8 +1,9 @@
+"use client"
+
 import { CONFIG } from "site.config"
 import { useEffect } from "react"
 import styled from "@emotion/styled"
 import useScheme from "src/hooks/useScheme"
-import { useRouter } from "next/router"
 
 //TODO: useRef?
 
@@ -12,7 +13,6 @@ type Props = {
 
 const Utterances: React.FC<Props> = ({ issueTerm }) => {
   const [scheme] = useScheme()
-  const router = useRouter()
 
   useEffect(() => {
     const theme = `github-${scheme}`
@@ -33,7 +33,7 @@ const Utterances: React.FC<Props> = ({ issueTerm }) => {
     return () => {
       anchor.innerHTML = ""
     }
-  }, [scheme, router])
+  }, [scheme, issueTerm])
   return (
     <>
       <StyledWrapper id="comments">
