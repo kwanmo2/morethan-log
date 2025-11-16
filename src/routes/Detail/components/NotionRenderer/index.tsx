@@ -13,7 +13,6 @@ import "react-notion-x/src/styles.css"
 import "prismjs/themes/prism-tomorrow.css"
 
 // used for rendering equations (optional)
-
 import "katex/dist/katex.min.css"
 import { FC } from "react"
 import styled from "@emotion/styled"
@@ -35,12 +34,7 @@ const Collection = dynamic(() =>
 const Equation = dynamic(() =>
   import("react-notion-x/build/third-party/equation").then((m) => m.Equation)
 )
-const Pdf = dynamic(
-  () => import("react-notion-x/build/third-party/pdf").then((m) => m.Pdf),
-  {
-    ssr: false,
-  }
-)
+// PDF rendering is disabled to avoid native `canvas` build requirements in serverless environments.
 const Modal = dynamic(
   () => import("react-notion-x/build/third-party/modal").then((m) => m.Modal),
   {
@@ -68,7 +62,6 @@ const NotionRenderer: FC<Props> = ({ recordMap }) => {
           Collection,
           Equation,
           Modal,
-          Pdf,
           nextImage: Image,
           nextLink: Link,
         }}
