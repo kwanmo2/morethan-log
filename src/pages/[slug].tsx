@@ -3,12 +3,8 @@ import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
 import { CONFIG } from "site.config"
 import { NextPageWithLayout } from "../types"
 import CustomError from "src/routes/Error"
-import { getRecordMap, getPosts } from "src/apis"
 import MetaConfig from "src/components/MetaConfig"
 import { GetStaticProps } from "next"
-import { queryClient } from "src/libs/react-query"
-import { queryKey } from "src/constants/queryKey"
-import { dehydrate } from "@tanstack/react-query"
 import usePostQuery from "src/hooks/usePostQuery"
 import { FilterPostsOptions } from "src/libs/utils/notion/filterPosts"
 import { DEFAULT_LANGUAGE } from "src/constants/language"
@@ -17,10 +13,9 @@ import {
   collectPostContents,
   selectContentByLanguage,
 } from "src/libs/utils/language"
-import {
-  loadAiTranslationRecordMap,
-  syncAiTranslations,
-} from "src/libs/server/aiTranslations"
+import { prefetchPostDetail } from "src/libs/server/prefetch"
+import { getPosts } from "src/apis"
+import { syncAiTranslations } from "src/libs/server/aiTranslations"
 
 const filter: FilterPostsOptions = {
   acceptStatus: ["Public", "PublicOnDetail"],
@@ -49,69 +44,18 @@ export const getStaticProps: GetStaticProps = async (context) => {
     }
   }
 
-  const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts)
-  const feedPosts = mergePostsByLanguage(
-    filterPosts(postsWithTranslations),
-    DEFAULT_LANGUAGE
-  )
-  await queryClient.prefetchQuery(queryKey.posts(), () => feedPosts)
+  const { dehydratedState, post } = await prefetchPostDetail(slugParam)
 
-  const detailPosts = mergePostsByLanguage(
-    filterPosts(postsWithTranslations, filter),
-    DEFAULT_LANGUAGE
-  )
-  const postDetail = detailPosts.find((post) => post.slug === slugParam)
-
-  if (!postDetail) {
+  if (!post) {
     return {
       notFound: true,
       revalidate: CONFIG.revalidateTime,
     }
   }
 
-  const contents = [postDetail, ...(postDetail.translations ?? [])]
-
-  const recordMaps = await Promise.all(
-    contents.map((content) => {
-      if (content.isAiTranslation) {
-        return loadAiTranslationRecordMap(content.id)
-      }
-      return getRecordMap(content.id)
-    })
-  )
-
-  const ensuredRecordMaps = recordMaps.map((recordMap, index) => {
-    if (!recordMap) {
-      throw new Error(
-        `Missing recordMap for ${contents[index].title}. Regenerate AI translations to continue.`
-      )
-    }
-    return recordMap
-  })
-
-  const [baseRecordMap, ...translationRecordMaps] = ensuredRecordMaps
-
-  const translationsWithRecordMap = (postDetail.translations ?? []).map(
-    (translation, index) => ({
-      ...translation,
-      recordMap: translationRecordMaps[index],
-    })
-  )
-
-  const hydratedPost = {
-    ...postDetail,
-    recordMap: baseRecordMap,
-    translations: translationsWithRecordMap.length
-      ? translationsWithRecordMap
-      : undefined,
-  }
-
-  await queryClient.prefetchQuery(queryKey.post(`${slugParam}`), () => hydratedPost)
-
   return {
     props: {
-      dehydratedState: dehydrate(queryClient),
+      dehydratedState,
     },
     revalidate: CONFIG.revalidateTime,
   }

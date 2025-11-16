@@ -1,3 +1,5 @@
+"use client"
+
 import React, { ReactNode, useEffect } from "react"
 import { ThemeProvider } from "./ThemeProvider"
 import useScheme from "src/hooks/useScheme"
