@@ -6,16 +6,20 @@ import { TPostBase } from "../../../types"
 import Image from "next/image"
 import Category from "../../../components/Category"
 import styled from "@emotion/styled"
+import { buildPostPath } from "src/libs/utils/paths"
+import useLanguage from "src/hooks/useLanguage"
 
 type Props = {
   data: TPostBase
 }
 
 const PostCard: React.FC<Props> = ({ data }) => {
+  const [language] = useLanguage()
+  const href = buildPostPath(data, language)
   const category = (data.category && data.category?.[0]) || undefined
 
   return (
-    <StyledWrapper href={`/${data.slug}`}>
+    <StyledWrapper href={href}>
       <article>
         {category && (
           <div className="category">
