@@ -1,7 +1,7 @@
 import Detail from "src/routes/Detail"
 import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
 import { CONFIG } from "site.config"
-import { NextPageWithLayout } from "../../types"
+import { NextPageWithLayout } from "src/types"
 import CustomError from "src/routes/Error"
 import { getRecordMap, getPosts } from "src/apis"
 import MetaConfig from "src/components/MetaConfig"
