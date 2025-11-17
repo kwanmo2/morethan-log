@@ -1,4 +1,6 @@
-import { useRouter } from "next/router"
+"use client"
+
+import { useSearchParams } from "next/navigation"
 import React, { useEffect, useState } from "react"
 import PostCard from "src/routes/Feed/PostList/PostCard"
 import { DEFAULT_CATEGORY } from "src/constants"
@@ -9,13 +11,13 @@ type Props = {
 }
 
 const PostList: React.FC<Props> = ({ q }) => {
-  const router = useRouter()
+  const searchParams = useSearchParams()
   const data = usePostsQuery()
   const [filteredPosts, setFilteredPosts] = useState(data)
 
-  const currentTag = `${router.query.tag || ``}` || undefined
-  const currentCategory = `${router.query.category || ``}` || DEFAULT_CATEGORY
-  const currentOrder = `${router.query.order || ``}` || "desc"
+  const currentTag = searchParams.get("tag") || undefined
+  const currentCategory = searchParams.get("category") || DEFAULT_CATEGORY
+  const currentOrder = searchParams.get("order") || "desc"
 
   useEffect(() => {
     setFilteredPosts(() => {

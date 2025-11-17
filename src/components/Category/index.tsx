@@ -1,4 +1,6 @@
-import { useRouter } from "next/router"
+"use client"
+
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import React from "react"
 import { COLOR_SET } from "./constants"
 import styled from "@emotion/styled"
@@ -24,10 +26,14 @@ type Props = {
 
 const Category: React.FC<Props> = ({ readOnly = false, children }) => {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const handleClick = (value: string) => {
     if (readOnly) return
-    router.push(`/?category=${value}`)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("category", value)
+    router.push(`${pathname}?${params.toString()}`)
   }
   return (
     <StyledWrapper

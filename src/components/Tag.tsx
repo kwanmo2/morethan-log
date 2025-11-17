@@ -1,5 +1,7 @@
+"use client"
+
 import styled from "@emotion/styled"
-import { useRouter } from "next/router"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import React from "react"
 
 type Props = {
@@ -8,9 +10,13 @@ type Props = {
 
 const Tag: React.FC<Props> = ({ children }) => {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const handleClick = (value: string) => {
-    router.push(`/?tag=${value}`)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tag", value)
+    router.push(`${pathname}?${params.toString()}`)
   }
   return (
     <StyledWrapper onClick={() => handleClick(children)}>

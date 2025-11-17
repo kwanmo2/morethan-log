@@ -1,5 +1,7 @@
+"use client"
+
 import styled from "@emotion/styled"
-import { useRouter } from "next/router"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import React from "react"
 import { Emoji } from "src/components/Emoji"
 import { useTagsQuery } from "src/hooks/useTagsQuery"
@@ -8,28 +10,20 @@ type Props = {}
 
 const TagList: React.FC<Props> = () => {
   const router = useRouter()
-  const currentTag = router.query.tag || undefined
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentTag = searchParams.get("tag") || undefined
   const data = useTagsQuery()
 
   const handleClickTag = (value: any) => {
-    // delete
+    const params = new URLSearchParams(searchParams.toString())
     if (currentTag === value) {
-      router.push({
-        query: {
-          ...router.query,
-          tag: undefined,
-        },
-      })
+      params.delete("tag")
+    } else {
+      params.set("tag", value)
     }
-    // add
-    else {
-      router.push({
-        query: {
-          ...router.query,
-          tag: value,
-        },
-      })
-    }
+    const queryString = params.toString()
+    router.push(queryString ? `${pathname}?${queryString}` : pathname)
   }
 
   return (

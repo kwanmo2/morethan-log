@@ -1,5 +1,7 @@
+"use client"
+
 import useDropdown from "src/hooks/useDropdown"
-import { useRouter } from "next/router"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import React from "react"
 import { MdExpandMore } from "react-icons/md"
 import { DEFAULT_CATEGORY } from "src/constants"
@@ -10,18 +12,17 @@ type Props = {}
 
 const CategorySelect: React.FC<Props> = () => {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const data = useCategoriesQuery()
   const [dropdownRef, opened, handleOpen] = useDropdown()
 
-  const currentCategory = `${router.query.category || ``}` || DEFAULT_CATEGORY
+  const currentCategory = searchParams.get("category") || DEFAULT_CATEGORY
 
   const handleOptionClick = (category: string) => {
-    router.push({
-      query: {
-        ...router.query,
-        category,
-      },
-    })
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("category", category)
+    router.push(`${pathname}?${params.toString()}`)
   }
   return (
     <StyledWrapper>

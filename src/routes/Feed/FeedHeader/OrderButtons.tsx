@@ -1,5 +1,7 @@
+"use client"
+
 import styled from "@emotion/styled"
-import { useRouter } from "next/router"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import React from "react"
 
 type TOrder = "asc" | "desc"
@@ -8,16 +10,15 @@ type Props = {}
 
 const OrderButtons: React.FC<Props> = () => {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  const currentOrder = `${router.query.order || ``}` || ("desc" as TOrder)
+  const currentOrder = (searchParams.get("order") || "desc") as TOrder
 
   const handleClickOrderBy = (value: TOrder) => {
-    router.push({
-      query: {
-        ...router.query,
-        order: value,
-      },
-    })
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("order", value)
+    router.push(`${pathname}?${params.toString()}`)
   }
   return (
     <StyledWrapper>
