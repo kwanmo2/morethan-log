@@ -5,6 +5,7 @@ import { TPost, TPostBase } from "src/types"
 import useLanguage from "./useLanguage"
 import { DEFAULT_LANGUAGE } from "src/constants/language"
 import { selectPostBaseByLanguage } from "src/libs/utils/language"
+import { buildPostSlug } from "src/libs/utils/paths"
 
 const usePostsQuery = () => {
   const [language] = useLanguage()
@@ -28,7 +29,7 @@ const usePostsQuery = () => {
         return {
           ...selected,
           id: post.id,
-          slug: post.slug,
+          slug: buildPostSlug(post.slug),
         }
       }),
     [data, language]

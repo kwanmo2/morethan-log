@@ -1,44 +1,35 @@
-import Feed from "src/routes/Feed"
-import { CONFIG } from "../../site.config"
-import { NextPageWithLayout } from "../types"
-import { getPosts } from "../apis"
-import MetaConfig from "src/components/MetaConfig"
-import { queryClient } from "src/libs/react-query"
-import { queryKey } from "src/constants/queryKey"
-import { GetStaticProps } from "next"
-import { dehydrate } from "@tanstack/react-query"
-import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
-import { syncAiTranslations } from "src/libs/server/aiTranslations"
+import Head from "next/head"
+import { GetStaticProps, NextPage } from "next"
+import { useRouter } from "next/router"
+import { useEffect } from "react"
 import { DEFAULT_LANGUAGE } from "src/constants/language"
+import { buildLanguageSegment } from "src/libs/utils/paths"
 
-export const getStaticProps: GetStaticProps = async () => {
-  const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts)
-  const filteredPosts = filterPosts(postsWithTranslations)
-  const mergedPosts = mergePostsByLanguage(filteredPosts, DEFAULT_LANGUAGE)
-  await queryClient.prefetchQuery(queryKey.posts(), () => mergedPosts)
+type IndexPageProps = {
+  redirectTo: string
+}
+
+export const getStaticProps: GetStaticProps<IndexPageProps> = async () => {
+  const redirectTo = `/${buildLanguageSegment(DEFAULT_LANGUAGE)}`
 
   return {
     props: {
-      dehydratedState: dehydrate(queryClient),
+      redirectTo,
     },
-    revalidate: CONFIG.revalidateTime,
   }
 }
 
-const FeedPage: NextPageWithLayout = () => {
-  const meta = {
-    title: CONFIG.blog.title,
-    description: CONFIG.blog.description,
-    type: "website",
-    url: CONFIG.link,
-  }
+const FeedPage: NextPage<IndexPageProps> = ({ redirectTo }) => {
+  const router = useRouter()
+
+  useEffect(() => {
+    router.replace(redirectTo)
+  }, [redirectTo, router])
 
   return (
-    <>
-      <MetaConfig {...meta} />
-      <Feed />
-    </>
+    <Head>
+      <meta httpEquiv="refresh" content={`0;url=${redirectTo}`} />
+    </Head>
   )
 }
 

@@ -1,7 +1,7 @@
 import Detail from "src/routes/Detail"
 import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
 import { CONFIG } from "site.config"
-import { NextPageWithLayout } from "../types"
+import { NextPageWithLayout } from "src/types"
 import CustomError from "src/routes/Error"
 import { getRecordMap, getPosts } from "src/apis"
 import MetaConfig from "src/components/MetaConfig"
@@ -16,11 +16,22 @@ import useLanguage from "src/hooks/useLanguage"
 import {
   collectPostContents,
   selectContentByLanguage,
+  extractPostLanguage,
 } from "src/libs/utils/language"
 import {
   loadAiTranslationRecordMap,
   syncAiTranslations,
 } from "src/libs/server/aiTranslations"
+import {
+  buildCategorySlug,
+  buildPostPath,
+  buildPostSlug,
+  buildLanguageSegment,
+  buildPostCacheKey,
+  getCanonicalUrl,
+} from "src/libs/utils/paths"
+import { useEffect, useMemo } from "react"
+import { useRouter } from "next/router"
 
 const filter: FilterPostsOptions = {
   acceptStatus: ["Public", "PublicOnDetail"],
@@ -33,21 +44,45 @@ export const getStaticPaths = async () => {
   const filteredPost = filterPosts(postsWithTranslations, filter)
   const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
 
+  const paths = mergedPosts.flatMap((post) => {
+    const contents = [post, ...(post.translations ?? [])]
+    return contents.map((content) => ({
+      params: {
+        lang: buildLanguageSegment(extractPostLanguage(content)),
+        category: buildCategorySlug(content.category),
+        slug: buildPostSlug(content.slug),
+      },
+    }))
+  })
+
   return {
-    paths: mergedPosts.map((row) => `/${row.slug}`),
+    paths,
     fallback: true,
   }
 }
 
 export const getStaticProps: GetStaticProps = async (context) => {
   const slugParam = context.params?.slug
+  const langParam = context.params?.lang
+  const categoryParam = context.params?.category
 
-  if (!slugParam || Array.isArray(slugParam)) {
+  if (
+    !slugParam ||
+    Array.isArray(slugParam) ||
+    !langParam ||
+    Array.isArray(langParam) ||
+    !categoryParam ||
+    Array.isArray(categoryParam)
+  ) {
     return {
       notFound: true,
       revalidate: CONFIG.revalidateTime,
     }
   }
+
+  const normalizedSlug = buildPostSlug(slugParam)
+  const normalizedCategory = buildCategorySlug([categoryParam])
+  const normalizedLanguage = buildLanguageSegment(langParam)
 
   const posts = await getPosts()
   const postsWithTranslations = await syncAiTranslations(posts)
@@ -61,7 +96,18 @@ export const getStaticProps: GetStaticProps = async (context) => {
     filterPosts(postsWithTranslations, filter),
     DEFAULT_LANGUAGE
   )
-  const postDetail = detailPosts.find((post) => post.slug === slugParam)
+
+  const postDetail = detailPosts.find((post) => {
+    const contents = [post, ...(post.translations ?? [])]
+    return contents.some((content) => {
+      const languageSegment = buildLanguageSegment(extractPostLanguage(content))
+      return (
+        buildPostSlug(content.slug) === normalizedSlug &&
+        buildCategorySlug(content.category) === normalizedCategory &&
+        languageSegment === normalizedLanguage
+      )
+    })
+  })
 
   if (!postDetail) {
     return {
@@ -95,19 +141,27 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const translationsWithRecordMap = (postDetail.translations ?? []).map(
     (translation, index) => ({
       ...translation,
+      slug: buildPostSlug(translation.slug),
       recordMap: translationRecordMaps[index],
     })
   )
 
   const hydratedPost = {
     ...postDetail,
+    slug: buildPostSlug(postDetail.slug),
     recordMap: baseRecordMap,
     translations: translationsWithRecordMap.length
       ? translationsWithRecordMap
       : undefined,
   }
 
-  await queryClient.prefetchQuery(queryKey.post(`${slugParam}`), () => hydratedPost)
+  const postCacheKey = buildPostCacheKey({
+    slug: normalizedSlug,
+    category: normalizedCategory,
+    language: normalizedLanguage,
+  })
+
+  await queryClient.prefetchQuery(queryKey.post(postCacheKey), () => hydratedPost)
 
   return {
     props: {
@@ -119,14 +173,26 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
 const DetailPage: NextPageWithLayout = () => {
   const post = usePostQuery()
-  const [language] = useLanguage()
+  const [language, setLanguage] = useLanguage()
+  const router = useRouter()
+  const pathLanguage = useMemo(() => {
+    const langParam = router.query.lang
+    if (typeof langParam !== "string") return undefined
+    return buildLanguageSegment(langParam)
+  }, [router.query.lang])
+
+  useEffect(() => {
+    if (pathLanguage) {
+      setLanguage(pathLanguage)
+    }
+  }, [pathLanguage, setLanguage])
 
   if (!post) return <CustomError />
 
   const contents = collectPostContents(post)
   const activeContent = selectContentByLanguage(
     contents,
-    language,
+    pathLanguage ?? language,
     DEFAULT_LANGUAGE
   )
 
@@ -141,13 +207,18 @@ const DetailPage: NextPageWithLayout = () => {
     activeContent.createdTime ||
     post.createdTime
 
+  const path = buildPostPath(post, pathLanguage ?? language)
+
   const meta = {
     title: activeContent.title,
     date: new Date(date).toISOString(),
     image,
     description: activeContent.summary || post.summary || "",
     type: activeContent.type[0],
-    url: `${CONFIG.link}/${post.slug}`,
+    url: getCanonicalUrl(path, CONFIG.link),
+    canonical: path,
+    keywords: activeContent.tags ?? post.tags ?? [],
+    language: pathLanguage ?? language,
   }
 
   return (

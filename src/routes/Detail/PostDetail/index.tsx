@@ -13,6 +13,7 @@ import {
   selectContentByLanguage,
 } from "src/libs/utils/language"
 import { TPostBase } from "src/types"
+import { buildPostPath } from "src/libs/utils/paths"
 
 type Props = {}
 
@@ -37,11 +38,12 @@ const PostDetail: React.FC<Props> = () => {
 
   const category =
     (activeContent.category && activeContent.category?.[0]) || undefined
+  const commentPath = buildPostPath(data, language)
 
   const commentTarget: TPostBase = {
     ...activeContent,
     id: data.id,
-    slug: data.slug,
+    slug: commentPath,
     status: data.status,
     type: activeContent.type,
     date: activeContent.date ?? data.date,
