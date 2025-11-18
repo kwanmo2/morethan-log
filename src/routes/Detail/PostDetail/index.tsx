@@ -6,6 +6,7 @@ import Category from "src/components/Category"
 import styled from "@emotion/styled"
 import NotionRenderer from "../components/NotionRenderer"
 import usePostQuery from "src/hooks/usePostQuery"
+import usePostsQuery from "src/hooks/usePostsQuery"
 import useLanguage from "src/hooks/useLanguage"
 import { DEFAULT_LANGUAGE } from "src/constants/language"
 import {
@@ -14,12 +15,15 @@ import {
 } from "src/libs/utils/language"
 import { TPostBase } from "src/types"
 import { buildPostPath } from "src/libs/utils/paths"
+import RelatedPosts from "./RelatedPosts"
+
 
 type Props = {}
 
 const PostDetail: React.FC<Props> = () => {
   const data = usePostQuery()
   const [language] = useLanguage()
+  const posts = usePostsQuery()
 
   const contents = useMemo(
     () => (data ? collectPostContents(data) : []),
@@ -33,6 +37,28 @@ const PostDetail: React.FC<Props> = () => {
         : null,
     [contents, language, data]
   )
+
+  const relatedPosts = useMemo(() => {
+    if (!data || !activeContent) return []
+
+    const categorySet = new Set(activeContent.category ?? [])
+    const tagSet = new Set(activeContent.tags ?? [])
+
+    const candidatesByCategory = posts.filter(
+      (post) =>
+        post.id !== data.id &&
+        post.category?.some((item) => categorySet.has(item))
+    )
+
+    const candidatesByTag = posts.filter(
+      (post) =>
+        post.id !== data.id &&
+        !candidatesByCategory.some((candidate) => candidate.id === post.id) &&
+        post.tags?.some((tag) => tagSet.has(tag))
+    )
+
+    return [...candidatesByCategory, ...candidatesByTag].slice(0, 3)
+  }, [activeContent, data, posts])
 
   if (!data || !activeContent) return null
 
@@ -69,6 +95,9 @@ const PostDetail: React.FC<Props> = () => {
           <>
             <Footer />
             <CommentBox data={commentTarget} />
+            {relatedPosts.length > 0 && (
+              <RelatedPosts posts={relatedPosts} />
+            )}
           </>
         )}
       </article>
