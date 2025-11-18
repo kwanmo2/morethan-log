@@ -17,6 +17,7 @@ import { TPostBase } from "src/types"
 import { buildPostPath } from "src/libs/utils/paths"
 import RelatedPosts from "./RelatedPosts"
 
+
 type Props = {}
 
 const PostDetail: React.FC<Props> = () => {
