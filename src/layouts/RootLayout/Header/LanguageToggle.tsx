@@ -10,10 +10,17 @@ import {
   selectContentByLanguage,
   extractPostLanguage,
 } from "src/libs/utils/language"
+import { useRouter } from "next/router"
+import {
+  buildLanguageSegment,
+  buildPostPath,
+  buildPostSlug,
+} from "src/libs/utils/paths"
 
 const LanguageToggle: React.FC = () => {
   const [language, setLanguage] = useLanguage()
   const post = usePostQuery()
+  const router = useRouter()
 
   const availableLanguages = useMemo(() => {
     if (!post) return null
@@ -23,7 +30,39 @@ const LanguageToggle: React.FC = () => {
   }, [post])
 
   const handleChange = (nextLanguage: string) => {
-    setLanguage(nextLanguage)
+    const normalizedLanguage = buildLanguageSegment(nextLanguage)
+    setLanguage(normalizedLanguage)
+
+    if (post) {
+      const contents = collectPostContents(post)
+      const activeContent = selectContentByLanguage(
+        contents,
+        normalizedLanguage,
+        DEFAULT_LANGUAGE
+      )
+      const path = buildPostPath(
+        { ...activeContent, slug: buildPostSlug(activeContent.slug) },
+        normalizedLanguage
+      )
+      router.push(path)
+      return
+    }
+
+    const [, currentCategory, currentSlug] = (router.asPath || "")
+      .split("?")[0]
+      .split("/")
+      .filter(Boolean)
+
+    if (!currentCategory || !currentSlug) {
+      router.push(`/${normalizedLanguage}`)
+      return
+    }
+
+    const targetPath = buildPostPath(
+      { slug: buildPostSlug(currentSlug), category: [currentCategory] },
+      normalizedLanguage
+    )
+    router.push(targetPath)
   }
 
   const isDisabled = (target: string) => {
