@@ -53,6 +53,7 @@ To keep the bilingual toggle in sync, you can generate English drafts for any Ko
 1. Create an [OpenAI API key](https://platform.openai.com/) and set it as `OPENAI_API_KEY`. Optionally override the default model with `OPENAI_MODEL` (defaults to `gpt-4o-mini`).
 2. Run `OPENAI_API_KEY=your_key yarn build` (or `yarn dev`) before deploying. During `getStaticProps`, missing translations are generated and stored as JSON files under `data/ai-translations/`.
 3. Commit the generated files so that production builds can read them without hitting the API again.
+4. To push the generated drafts back to Notion for further editing, set a Notion integration token as `NOTION_API_TOKEN`. The site writes to the database referenced by `NOTION_PAGE_ID` by default; override it with `NOTION_TRANSLATION_DATABASE_ID` if you want to keep translations in a separate database.
 
 If the key is not provided, the site will continue to use any previously generated translations, but newly written posts will remain Korean-only until you regenerate their English counterparts.
 
