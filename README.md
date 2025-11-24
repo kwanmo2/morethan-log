@@ -46,6 +46,17 @@ Next.js static blog using Notion as a Content Management System (CMS). Supports 
    - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` : Required to persist visitor statistics and comments using Upstash Redis REST API.
    - `VISITOR_TIMEZONE` *(optional)* and `NEXT_PUBLIC_VISITOR_TIMEZONE` *(optional)* : Override the default `Asia/Seoul` timezone when aggregating visitor statistics both on the server and client.
 
+### AI-assisted English translations
+
+To keep the bilingual toggle in sync, you can generate English drafts for any Korean-only post with OpenAI:
+
+1. Create an [OpenAI API key](https://platform.openai.com/) and set it as `OPENAI_API_KEY`. Optionally override the default model with `OPENAI_MODEL` (defaults to `gpt-4o-mini`).
+2. Run `OPENAI_API_KEY=your_key yarn build` (or `yarn dev`) before deploying. During `getStaticProps`, missing translations are generated and stored as JSON files under `data/ai-translations/`.
+3. (Optional) To store drafts back into Notion for manual editing, share a parent page with a Notion integration and set `NOTION_TRANSLATION_TOKEN` plus `NOTION_TRANSLATION_PARENT_PAGE_ID`. Each translation will be synced to a child page named `<slug> (English draft)` under that parent, and reruns will update the same page instead of creating duplicates.
+4. Commit the generated files so that production builds can read them without hitting the API again.
+
+If the key is not provided, the site will continue to use any previously generated translations, but newly written posts will remain Korean-only until you regenerate their English counterparts.
+
 ## 10 Steps to build your own morethan-log (by 23.06.23)
 
 <details>
