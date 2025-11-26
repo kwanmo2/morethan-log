@@ -44,15 +44,15 @@ const CONFIG = {
     },
   },
   googleSearchConsole: {
-    enable: false,
+    enable: true,
     config: {
-      siteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+      siteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "google-site-verification=QYAW84H0VqAb7WXCQrtcC-z1ZNdXPuR4ZxaOUXesSS4",
     },
   },
   naverSearchAdvisor: {
-    enable: false,
+    enable: true,
     config: {
-      siteVerification: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION || "",
+      siteVerification: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION || "cce27213942cb05a47aa55618ecebf602973a604",
     },
   },
   utterances: {
