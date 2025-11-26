@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 
 import { ExtendedRecordMap } from "notion-types"
+import { getTextContent } from "notion-utils"
 
 import { getRecordMap } from "src/apis"
 import {
@@ -31,6 +32,11 @@ type TranslationMetadata = {
   model: string
   translation: TPost
   recordMap: ExtendedRecordMap
+}
+
+type NotionSyncConfig = {
+  apiToken: string
+  databaseId: string
 }
 
 let cachedTranslations: TranslationMetadata[] | null = null
@@ -88,6 +94,238 @@ const writeTranslationFile = async (translation: TranslationMetadata) => {
         translation,
       ]
     : [translation]
+}
+
+const getNotionSyncConfig = (): NotionSyncConfig | null => {
+  const apiToken = process.env.NOTION_API_TOKEN
+  const databaseId = process.env.NOTION_TRANSLATION_DATABASE_ID || process.env.NOTION_PAGE_ID
+
+  if (!apiToken || !databaseId) return null
+
+  return { apiToken, databaseId }
+}
+
+const buildRichText = (text?: string) => {
+  if (!text?.trim()) return null
+  return [{ type: "text", text: { content: text } }]
+}
+
+const buildChildrenFromRecordMap = (
+  recordMap: ExtendedRecordMap,
+  blockId: string
+): any[] => {
+  const blockValue = recordMap.block?.[blockId]?.value as any
+  if (!blockValue) return []
+
+  const children = (blockValue.content ?? []).flatMap((childId: string) =>
+    buildChildrenFromRecordMap(recordMap, childId)
+  )
+
+  const text = getTextContent(blockValue.properties?.title || [])
+  const richText = buildRichText(text)
+
+  const withChildren = children.length ? { children } : undefined
+
+  switch (blockValue.type) {
+    case "text":
+    case "paragraph":
+      if (!richText) return children
+      return [
+        {
+          type: "paragraph",
+          paragraph: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "heading_1":
+      if (!richText) return children
+      return [
+        {
+          type: "heading_1",
+          heading_1: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "heading_2":
+      if (!richText) return children
+      return [
+        {
+          type: "heading_2",
+          heading_2: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "heading_3":
+      if (!richText) return children
+      return [
+        {
+          type: "heading_3",
+          heading_3: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "bulleted_list":
+    case "bulleted_list_item":
+      if (!richText) return children
+      return [
+        {
+          type: "bulleted_list_item",
+          bulleted_list_item: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "numbered_list":
+    case "numbered_list_item":
+      if (!richText) return children
+      return [
+        {
+          type: "numbered_list_item",
+          numbered_list_item: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "quote":
+      if (!richText) return children
+      return [
+        {
+          type: "quote",
+          quote: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "toggle":
+      if (!richText) return children
+      return [
+        {
+          type: "toggle",
+          toggle: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    case "to_do":
+      if (!richText) return children
+      return [
+        {
+          type: "to_do",
+          to_do: { rich_text: richText, checked: false },
+          ...withChildren,
+        },
+      ]
+    case "callout":
+      if (!richText) return children
+      return [
+        {
+          type: "callout",
+          callout: { rich_text: richText },
+          ...withChildren,
+        },
+      ]
+    default:
+      return children
+  }
+}
+
+const normalizeProperties = (post: TPost) => {
+  const properties: Record<string, unknown> = {
+    title: {
+      title: buildRichText(post.title) ?? [{ type: "text", text: { content: "" } }],
+    },
+  }
+
+  if (post.slug?.trim()) {
+    properties.slug = { rich_text: buildRichText(post.slug) ?? [] }
+  }
+
+  if (post.summary?.trim()) {
+    properties.summary = { rich_text: buildRichText(post.summary) ?? [] }
+  }
+
+  if (post.language?.length) {
+    properties.language = {
+      multi_select: post.language
+        .map((lang) => normalizeLanguageCode(lang))
+        .filter((lang): lang is string => Boolean(lang))
+        .map((lang) => ({ name: lang })),
+    }
+  }
+
+  if (post.type?.length) {
+    properties.type = { multi_select: post.type.map((entry) => ({ name: entry })) }
+  }
+
+  if (post.tags?.length) {
+    properties.tags = { multi_select: post.tags.map((entry) => ({ name: entry })) }
+  }
+
+  if (post.category?.length) {
+    properties.category = {
+      multi_select: post.category.map((entry) => ({ name: entry })),
+    }
+  }
+
+  if (post.status?.length) {
+    properties.status = { multi_select: post.status.map((entry) => ({ name: entry })) }
+  }
+
+  if (post.date?.start_date) {
+    properties.date = { date: { start: post.date.start_date } }
+  }
+
+  return properties
+}
+
+const notionRequest = async <T>(
+  path: string,
+  apiToken: string,
+  options: RequestInit
+): Promise<T> => {
+  const response = await fetch(`https://api.notion.com/v1/${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiToken}`,
+      "Notion-Version": "2022-06-28",
+      ...(options.headers || {}),
+    },
+  })
+
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`Notion request failed: ${response.status} ${detail}`)
+  }
+
+  return (await response.json()) as T
+}
+
+const publishTranslationToNotion = async (
+  translation: TranslationMetadata,
+  config: NotionSyncConfig
+) => {
+  const rootBlock = translation.recordMap.block?.[translation.sourcePostId]?.value
+  if (!rootBlock?.content?.length) return
+
+  const children = rootBlock.content.flatMap((childId: string) =>
+    buildChildrenFromRecordMap(translation.recordMap, childId)
+  )
+
+  const properties = normalizeProperties(translation.translation)
+
+  const page = await notionRequest<{ id: string }>("pages", config.apiToken, {
+    method: "POST",
+    body: JSON.stringify({
+      parent: { database_id: config.databaseId },
+      properties,
+    }),
+  })
+
+  const chunkedChildren = chunkArray(children, 100)
+  for (const chunk of chunkedChildren) {
+    if (!chunk.length) continue
+    await notionRequest(`blocks/${page.id}/children`, config.apiToken, {
+      method: "PATCH",
+      body: JSON.stringify({ children: chunk }),
+    })
+  }
 }
 
 const collectTextSegments = (recordMap: ExtendedRecordMap): TextSegment[] => {
@@ -294,6 +532,30 @@ const hasEnglishTranslation = (posts: TPost[]) => {
   )
 }
 
+const syncTranslationsToNotionDatabase = async (
+  grouped: Map<string, TPost[]>,
+  stored: TranslationMetadata[]
+) => {
+  const config = getNotionSyncConfig()
+  if (!config) return
+
+  for (const [slug, posts] of grouped.entries()) {
+    if (hasEnglishTranslation(posts)) continue
+
+    const translation = stored.find((entry) => entry.slug === slug)
+    if (!translation) continue
+
+    try {
+      await publishTranslationToNotion(translation, config)
+      console.info(`[@ai-translation] Synced English draft for "${slug}" to Notion.`)
+    } catch (error) {
+      console.error(
+        `[@ai-translation] Failed to sync "${slug}" to Notion: ${(error as Error).message}`
+      )
+    }
+  }
+}
+
 const groupPostsBySlug = (posts: TPost[]) => {
   const grouped = new Map<string, TPost[]>()
   posts.forEach((post) => {
@@ -356,6 +618,8 @@ export const syncAiTranslations = async (posts: TPost[]) => {
 
   const updatedStore = await readStoredTranslations()
   const translations = updatedStore.map((entry) => entry.translation)
+
+  await syncTranslationsToNotionDatabase(grouped, updatedStore)
 
   return [...posts, ...translations]
 }
