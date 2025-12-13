@@ -279,12 +279,14 @@ const notionRequest = async <T>(
   apiToken: string,
   options: RequestInit
 ): Promise<T> => {
+  // The Notion API enforces versioned requests; align with the 2025-09-03 upgrade.
+  const NOTION_API_VERSION = "2025-09-03"
   const response = await fetch(`https://api.notion.com/v1/${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiToken}`,
-      "Notion-Version": "2022-06-28",
+      "Notion-Version": NOTION_API_VERSION,
       ...(options.headers || {}),
     },
   })
