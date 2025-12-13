@@ -11,12 +11,26 @@ import {
 } from "src/libs/utils/language"
 import { TPost, TPostBase } from "src/types"
 
-const AI_TRANSLATIONS_DIR = path.join(process.cwd(), "data", "ai-translations")
+const PERSISTENT_TRANSLATIONS_DIR = path.join(
+  process.cwd(),
+  "public",
+  "ai-translations"
+)
+const LEGACY_TRANSLATIONS_DIR = path.join(
+  process.cwd(),
+  "data",
+  "ai-translations"
+)
+const TRANSLATION_DIRECTORIES = [
+  PERSISTENT_TRANSLATIONS_DIR,
+  LEGACY_TRANSLATIONS_DIR,
+]
 const LANGUAGE_CODE = "en"
 const SKIPPED_BLOCK_TYPES = new Set(["code", "equation"])
 const TEXT_PROPERTY_KEYS = ["title", "caption"] as const
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 const TRANSLATION_BATCH_SIZE = 60
+const NOTION_API_VERSION = "2025-09-03"
 
 type TextSegment = {
   blockId: string
@@ -50,42 +64,84 @@ const cloneRecordMap = (recordMap: ExtendedRecordMap): ExtendedRecordMap => {
 
 const sanitizeFileName = (slug: string) => slug.replace(/[^a-zA-Z0-9-_]/g, "-")
 
-const buildFilePath = (slug: string) =>
-  path.join(AI_TRANSLATIONS_DIR, `${sanitizeFileName(slug)}-${LANGUAGE_CODE}.json`)
+const buildFilePath = (directory: string, slug: string) =>
+  path.join(directory, `${sanitizeFileName(slug)}-${LANGUAGE_CODE}.json`)
 
-const ensureDirectory = async () => {
-  await fs.mkdir(AI_TRANSLATIONS_DIR, { recursive: true })
+const ensureDirectory = async (directory: string) => {
+  await fs.mkdir(directory, { recursive: true })
 }
 
-const readStoredTranslations = async () => {
-  if (cachedTranslations) return cachedTranslations
+const readDirectoryTranslations = async (directory: string) => {
   try {
-    await ensureDirectory()
-    const files = await fs.readdir(AI_TRANSLATIONS_DIR)
+    const files = await fs.readdir(directory)
     const jsonFiles = files.filter((file) => file.endsWith(".json"))
-    const parsed = await Promise.all(
+    return Promise.all(
       jsonFiles.map(async (file) => {
-        const fullPath = path.join(AI_TRANSLATIONS_DIR, file)
+        const fullPath = path.join(directory, file)
         const raw = await fs.readFile(fullPath, "utf8")
         return JSON.parse(raw) as TranslationMetadata
       })
     )
-    cachedTranslations = parsed
-    return parsed
   } catch (error) {
     const nodeError = error as NodeJS.ErrnoException
-    if (nodeError.code === "ENOENT") {
-      cachedTranslations = []
+    if (nodeError.code === "ENOENT" || nodeError.code === "EROFS") {
       return []
     }
     throw error
   }
 }
 
+const readStoredTranslations = async () => {
+  if (cachedTranslations) return cachedTranslations
+
+  const collected = new Map<string, TranslationMetadata>()
+
+  for (const directory of TRANSLATION_DIRECTORIES) {
+    const translations = await readDirectoryTranslations(directory)
+    translations.forEach((entry) => {
+      const key = entry.translation?.id || entry.slug
+      if (!key || collected.has(key)) return
+      collected.set(key, entry)
+    })
+  }
+
+  const merged = Array.from(collected.values())
+  cachedTranslations = merged
+  return merged
+}
+
 const writeTranslationFile = async (translation: TranslationMetadata) => {
-  await ensureDirectory()
-  const filePath = buildFilePath(translation.slug)
-  await fs.writeFile(filePath, JSON.stringify(translation, null, 2), "utf8")
+  try {
+    await ensureDirectory(PERSISTENT_TRANSLATIONS_DIR)
+    const persistentPath = buildFilePath(
+      PERSISTENT_TRANSLATIONS_DIR,
+      translation.slug
+    )
+    await fs.writeFile(
+      persistentPath,
+      JSON.stringify(translation, null, 2),
+      "utf8"
+    )
+  } catch (error) {
+    console.warn(
+      `[@ai-translation] Unable to write persistent translation file: ${(error as Error).message}`
+    )
+  }
+
+  try {
+    await ensureDirectory(LEGACY_TRANSLATIONS_DIR)
+    const legacyPath = buildFilePath(LEGACY_TRANSLATIONS_DIR, translation.slug)
+    await fs.writeFile(
+      legacyPath,
+      JSON.stringify(translation, null, 2),
+      "utf8"
+    )
+  } catch (error) {
+    console.warn(
+      `[@ai-translation] Unable to write legacy translation file: ${(error as Error).message}`
+    )
+  }
+
   cachedTranslations = cachedTranslations
     ? [
         ...cachedTranslations.filter(
