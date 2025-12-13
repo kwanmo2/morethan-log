@@ -73,7 +73,6 @@ const ensureDirectory = async (directory: string) => {
 
 const readDirectoryTranslations = async (directory: string) => {
   try {
-    await ensureDirectory(directory)
     const files = await fs.readdir(directory)
     const jsonFiles = files.filter((file) => file.endsWith(".json"))
     return Promise.all(
@@ -85,7 +84,7 @@ const readDirectoryTranslations = async (directory: string) => {
     )
   } catch (error) {
     const nodeError = error as NodeJS.ErrnoException
-    if (nodeError.code === "ENOENT") {
+    if (nodeError.code === "ENOENT" || nodeError.code === "EROFS") {
       return []
     }
     throw error
@@ -112,16 +111,22 @@ const readStoredTranslations = async () => {
 }
 
 const writeTranslationFile = async (translation: TranslationMetadata) => {
-  await ensureDirectory(PERSISTENT_TRANSLATIONS_DIR)
-  const persistentPath = buildFilePath(
-    PERSISTENT_TRANSLATIONS_DIR,
-    translation.slug
-  )
-  await fs.writeFile(
-    persistentPath,
-    JSON.stringify(translation, null, 2),
-    "utf8"
-  )
+  try {
+    await ensureDirectory(PERSISTENT_TRANSLATIONS_DIR)
+    const persistentPath = buildFilePath(
+      PERSISTENT_TRANSLATIONS_DIR,
+      translation.slug
+    )
+    await fs.writeFile(
+      persistentPath,
+      JSON.stringify(translation, null, 2),
+      "utf8"
+    )
+  } catch (error) {
+    console.warn(
+      `[@ai-translation] Unable to write persistent translation file: ${(error as Error).message}`
+    )
+  }
 
   try {
     await ensureDirectory(LEGACY_TRANSLATIONS_DIR)
