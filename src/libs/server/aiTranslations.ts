@@ -55,6 +55,10 @@ type NotionSyncConfig = {
 
 let cachedTranslations: TranslationMetadata[] | null = null
 
+type SyncOptions = {
+  allowGeneration?: boolean
+}
+
 const cloneRecordMap = (recordMap: ExtendedRecordMap): ExtendedRecordMap => {
   if (typeof structuredClone === "function") {
     return structuredClone(recordMap)
@@ -498,7 +502,12 @@ class OpenAiTranslator {
 
     const translations = parsed?.translations
     if (!Array.isArray(translations) || translations.length !== texts.length) {
-      throw new Error("OpenAI response length mismatch")
+      console.warn(
+        `[@ai-translation] OpenAI response length mismatch (expected ${texts.length}, got ${
+          Array.isArray(translations) ? translations.length : "invalid"
+        }). Falling back to originals.`
+      )
+      return texts
     }
 
     return translations.map((entry: unknown, index: number) => {
@@ -634,7 +643,11 @@ const selectSourcePost = (posts: TPost[]) => {
   )
 }
 
-export const syncAiTranslations = async (posts: TPost[]) => {
+export const syncAiTranslations = async (
+  posts: TPost[],
+  options?: SyncOptions
+) => {
+  const allowGeneration = options?.allowGeneration ?? true
   const stored = await readStoredTranslations()
   const grouped = groupPostsBySlug(posts)
   const storedSlugs = new Set(stored.map((entry) => entry.slug))
@@ -648,36 +661,46 @@ export const syncAiTranslations = async (posts: TPost[]) => {
     pending.push({ slug, post: source })
   })
 
-  const apiKey = process.env.OPENAI_API_KEY
-  if (pending.length && !apiKey) {
-    console.warn(
-      `[ai-translation] Missing OPENAI_API_KEY. Unable to generate English versions for: ${pending
+  if (allowGeneration) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (pending.length && !apiKey) {
+      console.warn(
+        `[ai-translation] Missing OPENAI_API_KEY. Unable to generate English versions for: ${pending
+          .map((entry) => entry.slug)
+          .join(", ")}`
+      )
+    }
+
+    if (pending.length && apiKey) {
+      const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
+      for (const entry of pending) {
+        try {
+          const translation = await translator.createTranslation(entry.post)
+          await writeTranslationFile(translation)
+          console.info(
+            `[ai-translation] Generated English draft for "${entry.slug}" using ${translator.model}.`
+          )
+        } catch (error) {
+          console.error(
+            `[ai-translation] Failed to translate "${entry.slug}": ${(error as Error).message}`
+          )
+        }
+      }
+    }
+  } else if (pending.length) {
+    console.info(
+      `[@ai-translation] Skipping generation for ${pending.length} post(s) because allowGeneration=false. Slugs: ${pending
         .map((entry) => entry.slug)
         .join(", ")}`
     )
   }
 
-  if (pending.length && apiKey) {
-    const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
-    for (const entry of pending) {
-      try {
-        const translation = await translator.createTranslation(entry.post)
-        await writeTranslationFile(translation)
-        console.info(
-          `[ai-translation] Generated English draft for "${entry.slug}" using ${translator.model}.`
-        )
-      } catch (error) {
-        console.error(
-          `[ai-translation] Failed to translate "${entry.slug}": ${(error as Error).message}`
-        )
-      }
-    }
-  }
-
   const updatedStore = await readStoredTranslations()
   const translations = updatedStore.map((entry) => entry.translation)
 
-  await syncTranslationsToNotionDatabase(grouped, updatedStore)
+  if (allowGeneration) {
+    await syncTranslationsToNotionDatabase(grouped, updatedStore)
+  }
 
   return [...posts, ...translations]
 }
