@@ -12,18 +12,9 @@ import {
 import { extractPostLanguage } from "src/libs/utils/language"
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "src/constants/language"
 
-const sanitizeTranslations = (post: any) => {
-  const translations = (post.translations ?? []).filter(Boolean)
-  if (!translations.length) {
-    const { translations: _omit, ...rest } = post
-    return rest
-  }
-  return { ...post, translations }
-}
-
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const posts = await getPosts()
-  const postsWithTranslations = (await syncAiTranslations(posts)).map(sanitizeTranslations)
+  const postsWithTranslations = await syncAiTranslations(posts)
   const filteredPosts = filterPosts(postsWithTranslations)
   const mergedPosts = mergePostsByLanguage(filteredPosts, DEFAULT_LANGUAGE)
 

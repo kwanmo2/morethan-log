@@ -38,19 +38,10 @@ const filter: FilterPostsOptions = {
   acceptType: ["Paper", "Post", "Page"],
 }
 
-const sanitizeTranslations = (post: any) => {
-  const translations = (post.translations ?? []).filter(Boolean)
-  if (!translations.length) {
-    const { translations: _omit, ...rest } = post
-    return rest
-  }
-  return { ...post, translations }
-}
-
 export const getStaticPaths = async () => {
   const posts = await getPosts()
   const postsWithTranslations = await syncAiTranslations(posts)
-  const filteredPost = filterPosts(postsWithTranslations, filter).map(sanitizeTranslations)
+  const filteredPost = filterPosts(postsWithTranslations, filter)
   const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
 
   const paths = mergedPosts.flatMap((post) => {
@@ -94,7 +85,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const normalizedLanguage = buildLanguageSegment(langParam)
 
   const posts = await getPosts()
-  const postsWithTranslations = (await syncAiTranslations(posts)).map(sanitizeTranslations)
+  const postsWithTranslations = await syncAiTranslations(posts)
   const feedPosts = mergePostsByLanguage(
     filterPosts(postsWithTranslations),
     DEFAULT_LANGUAGE
