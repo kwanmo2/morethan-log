@@ -31,11 +31,15 @@ const TEXT_PROPERTY_KEYS = ["title", "caption"] as const
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 const TRANSLATION_BATCH_SIZE = 60
 const NOTION_API_VERSION = "2025-09-03"
+const generationAttempts = new Set<string>()
+let backgroundGeneration: Promise<void> | null = null
 const isAiTranslationDisabled = () => {
   const flag = process.env.AI_TRANSLATIONS_DISABLED
   if (!flag) return false
   return ["1", "true", "yes"].includes(flag.toLowerCase())
 }
+
+const shouldDeferGeneration = () => process.env.VERCEL === "1"
 
 type TextSegment = {
   blockId: string
@@ -502,13 +506,20 @@ class OpenAiTranslator {
     }
 
     const translations = parsed?.translations
-    if (!Array.isArray(translations) || translations.length !== texts.length) {
+    if (!Array.isArray(translations)) {
       throw new Error("OpenAI response length mismatch")
     }
 
-    return translations.map((entry: unknown, index: number) => {
+    if (translations.length !== texts.length) {
+      console.warn(
+        `[@ai-translation] OpenAI response length mismatch (expected ${texts.length}, received ${translations.length}). Falling back to best-effort mapping.`
+      )
+    }
+
+    return texts.map((text, index) => {
+      const entry = translations[index]
       if (typeof entry === "string" && entry.trim().length > 0) return entry
-      return texts[index]
+      return text
     })
   }
 
@@ -639,6 +650,41 @@ const selectSourcePost = (posts: TPost[]) => {
   )
 }
 
+const generateMissingTranslations = async (
+  pending: { slug: string; post: TPost }[],
+  translator: OpenAiTranslator
+) => {
+  for (const entry of pending) {
+    if (generationAttempts.has(entry.slug)) continue
+    generationAttempts.add(entry.slug)
+    try {
+      const translation = await translator.createTranslation(entry.post)
+      await writeTranslationFile(translation)
+      console.info(
+        `[ai-translation] Generated English draft for "${entry.slug}" using ${translator.model}.`
+      )
+    } catch (error) {
+      console.error(
+        `[ai-translation] Failed to translate "${entry.slug}": ${(error as Error).message}`
+      )
+    }
+  }
+}
+
+const runTranslationPipeline = async (
+  pending: { slug: string; post: TPost }[],
+  translator: OpenAiTranslator,
+  grouped: Map<string, TPost[]>,
+  shouldSyncToNotion: boolean
+) => {
+  await generateMissingTranslations(pending, translator)
+  const refreshedStore = await readStoredTranslations()
+  if (shouldSyncToNotion) {
+    await syncTranslationsToNotionDatabase(grouped, refreshedStore)
+  }
+  return refreshedStore
+}
+
 export const syncAiTranslations = async (posts: TPost[]) => {
   if (isAiTranslationDisabled()) {
     const stored = await readStoredTranslations()
@@ -661,6 +707,7 @@ export const syncAiTranslations = async (posts: TPost[]) => {
   grouped.forEach((groupPosts, slug) => {
     if (hasEnglishTranslation(groupPosts)) return
     if (storedSlugs.has(slug)) return
+    if (generationAttempts.has(slug)) return
     const source = selectSourcePost(groupPosts)
     if (!source) return
     pending.push({ slug, post: source })
@@ -675,27 +722,39 @@ export const syncAiTranslations = async (posts: TPost[]) => {
     )
   }
 
+  let resultStore = stored
+  const deferGeneration = shouldDeferGeneration()
+
   if (pending.length && apiKey) {
     const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
-    for (const entry of pending) {
-      try {
-        const translation = await translator.createTranslation(entry.post)
-        await writeTranslationFile(translation)
+    const executePipeline = () => runTranslationPipeline(pending, translator, grouped, true)
+
+    if (deferGeneration) {
+      if (!backgroundGeneration) {
+        backgroundGeneration = executePipeline()
+          .catch((error) => {
+            console.error(
+              `[@ai-translation] Background translation pipeline failed: ${(error as Error).message}`
+            )
+          })
+          .finally(() => {
+            backgroundGeneration = null
+          })
         console.info(
-          `[ai-translation] Generated English draft for "${entry.slug}" using ${translator.model}.`
-        )
-      } catch (error) {
-        console.error(
-          `[ai-translation] Failed to translate "${entry.slug}": ${(error as Error).message}`
+          "[@ai-translation] Started background English translation generation (non-blocking for build)."
         )
       }
+    } else {
+      resultStore = await executePipeline()
     }
   }
 
-  const updatedStore = await readStoredTranslations()
-  const translations = updatedStore.map((entry) => entry.translation)
+  const pipelineHandledSync = pending.length > 0 && Boolean(apiKey)
+  if (!deferGeneration && !pipelineHandledSync) {
+    await syncTranslationsToNotionDatabase(grouped, resultStore)
+  }
 
-  await syncTranslationsToNotionDatabase(grouped, updatedStore)
+  const translations = resultStore.map((entry) => entry.translation)
 
   return [...posts, ...translations]
 }
