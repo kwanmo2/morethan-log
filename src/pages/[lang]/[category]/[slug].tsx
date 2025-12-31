@@ -40,7 +40,9 @@ const filter: FilterPostsOptions = {
 
 export const getStaticPaths = async () => {
   const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts)
+  const postsWithTranslations = await syncAiTranslations(posts, {
+    allowGeneration: process.env.OPENAI_DISABLE_DURING_BUILD !== "1",
+  })
   const filteredPost = filterPosts(postsWithTranslations, filter)
   const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
 
@@ -85,7 +87,9 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const normalizedLanguage = buildLanguageSegment(langParam)
 
   const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts)
+  const postsWithTranslations = await syncAiTranslations(posts, {
+    allowGeneration: process.env.OPENAI_DISABLE_DURING_BUILD !== "1",
+  })
   const feedPosts = mergePostsByLanguage(
     filterPosts(postsWithTranslations),
     DEFAULT_LANGUAGE
