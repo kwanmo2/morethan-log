@@ -22,6 +22,15 @@ export const getStaticPaths: GetStaticPaths = () => {
   }
 }
 
+const sanitizeTranslations = (post: any) => {
+  const translations = (post.translations ?? []).filter(Boolean)
+  if (!translations.length) {
+    const { translations: _omit, ...rest } = post
+    return rest
+  }
+  return { ...post, translations }
+}
+
 export const getStaticProps: GetStaticProps = async (context) => {
   const langParam = context.params?.lang
 
@@ -32,7 +41,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
   }
 
   const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts)
+  const postsWithTranslations = (await syncAiTranslations(posts)).map(sanitizeTranslations)
   const filteredPosts = filterPosts(postsWithTranslations)
   const mergedPosts = mergePostsByLanguage(filteredPosts, DEFAULT_LANGUAGE)
   await queryClient.prefetchQuery(queryKey.posts(), () => mergedPosts)
