@@ -40,7 +40,7 @@ export const mergePostsByLanguage = (
 
     return {
       ...primary,
-      translations: translations.length ? translations : undefined,
+      translations,
     }
   })
 }

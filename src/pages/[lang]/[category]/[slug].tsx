@@ -150,9 +150,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
     ...postDetail,
     slug: buildPostSlug(postDetail.slug),
     recordMap: baseRecordMap,
-    translations: translationsWithRecordMap.length
-      ? translationsWithRecordMap
-      : undefined,
+    translations: translationsWithRecordMap,
   }
 
   const postCacheKey = buildPostCacheKey({
