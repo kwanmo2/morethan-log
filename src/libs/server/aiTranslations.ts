@@ -31,6 +31,11 @@ const TEXT_PROPERTY_KEYS = ["title", "caption"] as const
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 const TRANSLATION_BATCH_SIZE = 60
 const NOTION_API_VERSION = "2025-09-03"
+const isAiTranslationDisabled = () => {
+  const flag = process.env.AI_TRANSLATIONS_DISABLED
+  if (!flag) return false
+  return ["1", "true", "yes"].includes(flag.toLowerCase())
+}
 
 type TextSegment = {
   blockId: string
@@ -635,6 +640,19 @@ const selectSourcePost = (posts: TPost[]) => {
 }
 
 export const syncAiTranslations = async (posts: TPost[]) => {
+  if (isAiTranslationDisabled()) {
+    const stored = await readStoredTranslations()
+    if (!stored.length) {
+      console.info("[ai-translation] Skipped. Set AI_TRANSLATIONS_DISABLED=false to enable.")
+      return posts
+    }
+    console.info(
+      `[@ai-translation] Skipped generation due to AI_TRANSLATIONS_DISABLED. Serving ${stored.length} stored translations.`
+    )
+    const translations = stored.map((entry) => entry.translation)
+    return [...posts, ...translations]
+  }
+
   const stored = await readStoredTranslations()
   const grouped = groupPostsBySlug(posts)
   const storedSlugs = new Set(stored.map((entry) => entry.slug))
