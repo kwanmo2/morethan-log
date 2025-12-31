@@ -14,9 +14,7 @@ import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "src/constants/language"
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts, {
-    allowGeneration: process.env.OPENAI_DISABLE_DURING_BUILD !== "1",
-  })
+  const postsWithTranslations = await syncAiTranslations(posts)
   const filteredPosts = filterPosts(postsWithTranslations)
   const mergedPosts = mergePostsByLanguage(filteredPosts, DEFAULT_LANGUAGE)
 

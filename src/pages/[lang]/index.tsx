@@ -32,9 +32,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
   }
 
   const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts, {
-    allowGeneration: process.env.OPENAI_DISABLE_DURING_BUILD !== "1",
-  })
+  const postsWithTranslations = await syncAiTranslations(posts)
   const filteredPosts = filterPosts(postsWithTranslations)
   const mergedPosts = mergePostsByLanguage(filteredPosts, DEFAULT_LANGUAGE)
   await queryClient.prefetchQuery(queryKey.posts(), () => mergedPosts)
