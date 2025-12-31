@@ -727,11 +727,16 @@ export const syncAiTranslations = async (posts: TPost[]) => {
 
   if (pending.length && apiKey) {
     const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
-    const executePipeline = () => runTranslationPipeline(pending, translator, grouped, true)
+    const executePipeline = () =>
+      runTranslationPipeline(pending, translator, grouped, true)
+        .then((store) => store)
 
     if (deferGeneration) {
       if (!backgroundGeneration) {
         backgroundGeneration = executePipeline()
+          .then(() => {
+            /* background pipeline finished */
+          })
           .catch((error) => {
             console.error(
               `[@ai-translation] Background translation pipeline failed: ${(error as Error).message}`
