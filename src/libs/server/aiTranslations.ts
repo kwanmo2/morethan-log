@@ -39,7 +39,8 @@ const isAiTranslationDisabled = () => {
   return ["1", "true", "yes"].includes(flag.toLowerCase())
 }
 
-const shouldDeferGeneration = () => process.env.VERCEL === "1"
+const shouldDeferGeneration = () =>
+  process.env.AI_TRANSLATIONS_BACKGROUND === "1"
 
 type TextSegment = {
   blockId: string
