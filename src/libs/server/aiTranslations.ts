@@ -59,6 +59,21 @@ type SyncOptions = {
   allowGeneration?: boolean
 }
 
+const shouldAllowGeneration = (options?: SyncOptions) => {
+  if (typeof options?.allowGeneration === "boolean") {
+    return options.allowGeneration
+  }
+
+  if (process.env.OPENAI_ENABLE_DURING_BUILD === "1") return true
+
+  const disableFlag = process.env.OPENAI_DISABLE_DURING_BUILD === "1"
+  const runningOnVercel = process.env.VERCEL === "1"
+
+  if (disableFlag || runningOnVercel) return false
+
+  return true
+}
+
 const cloneRecordMap = (recordMap: ExtendedRecordMap): ExtendedRecordMap => {
   if (typeof structuredClone === "function") {
     return structuredClone(recordMap)
@@ -647,7 +662,7 @@ export const syncAiTranslations = async (
   posts: TPost[],
   options?: SyncOptions
 ) => {
-  const allowGeneration = options?.allowGeneration ?? true
+  const allowGeneration = shouldAllowGeneration(options)
   const stored = await readStoredTranslations()
   const grouped = groupPostsBySlug(posts)
   const storedSlugs = new Set(stored.map((entry) => entry.slug))
