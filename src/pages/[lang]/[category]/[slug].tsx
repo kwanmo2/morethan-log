@@ -138,28 +138,21 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
   const [baseRecordMap, ...translationRecordMaps] = ensuredRecordMaps
 
-  const translationsWithRecordMap = (postDetail.translations ?? []).flatMap(
-    (translation, index) => {
-      const recordMap = translationRecordMaps[index]
-      if (!recordMap) return []
-      return [
-        {
-          ...translation,
-          slug: buildPostSlug(translation.slug),
-          recordMap,
-        },
-      ]
-    }
+  const translationsWithRecordMap = (postDetail.translations ?? []).map(
+    (translation, index) => ({
+      ...translation,
+      slug: buildPostSlug(translation.slug),
+      recordMap: translationRecordMaps[index],
+    })
   )
 
-  const hydratedPost: any = {
+  const hydratedPost = {
     ...postDetail,
     slug: buildPostSlug(postDetail.slug),
     recordMap: baseRecordMap,
-  }
-
-  if (translationsWithRecordMap.length) {
-    hydratedPost.translations = translationsWithRecordMap
+    translations: translationsWithRecordMap.length
+      ? translationsWithRecordMap
+      : undefined,
   }
 
   const postCacheKey = buildPostCacheKey({
