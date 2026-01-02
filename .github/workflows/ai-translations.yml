@@ -1,4 +1,4 @@
-﻿name: Generate AI Translations
+name: Generate AI Translations
 
 on:
   workflow_dispatch:    # ?섎룞 ?ㅽ뻾
@@ -35,21 +35,9 @@ jobs:
           AI_TRANSLATIONS_BACKGROUND: "0"    # ?앹꽦 媛뺤젣
           AI_TRANSLATIONS_DISABLED: ""       # 李⑤떒 ?댁젣
         run: yarn run generate:translations
-
-      # ?좏깮 1) ?앹꽦??JSON????μ냼??而ㅻ컠/?몄떆 (?먰븯硫?二쇱꽍 ?댁젣)
-      # - name: Commit generated translations
-      #   run: |
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      #     git add public/ai-translations data/ai-translations || true
-      #     git commit -m "chore: update ai translations" || echo "No changes"
-      #     git push
-
-      # ?좏깮 2) ?몃? ?ㅽ넗由ъ?(S3/Blob ?????낅줈?쒗븯怨? Vercel 鍮뚮뱶 ?꾩뿉 ?대젮諛쏅뒗 ?ㅽ뀦??異붽??????덉쓬.
-
-      # ?듭뀡) 踰덉뿭 ?앹꽦 ??Vercel 諛고룷 ?몃━嫄?
+        
       - name: Trigger Vercel Deploy Hook
-        if: ${{ env.VERCEL_DEPLOY_HOOK_URL != '' }}
+        if: env.VERCEL_DEPLOY_HOOK_URL != ''
         env:
           VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: curl -X POST "$VERCEL_DEPLOY_HOOK_URL"
