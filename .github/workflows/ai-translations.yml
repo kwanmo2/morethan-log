@@ -1,9 +1,9 @@
-name: Generate AI Translations
+﻿name: Generate AI Translations
 
 on:
-  workflow_dispatch:    # 수동 실행
+  workflow_dispatch:    # ?섎룞 ?ㅽ뻾
   push:
-    branches: [main]    # 필요에 따라 브랜치 조정
+    branches: [main]    # ?꾩슂???곕씪 釉뚮옖移?議곗젙
 
 jobs:
   generate-translations:
@@ -30,13 +30,13 @@ jobs:
       - name: Generate AI translations
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}                # 선택
-          NOTION_TRANSLATION_DATABASE_ID: ${{ secrets.NOTION_TRANSLATION_DATABASE_ID }}  # 선택
-          AI_TRANSLATIONS_BACKGROUND: "0"    # 생성 강제
-          AI_TRANSLATIONS_DISABLED: ""       # 차단 해제
+          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}                # ?좏깮
+          NOTION_TRANSLATION_DATABASE_ID: ${{ secrets.NOTION_TRANSLATION_DATABASE_ID }}  # ?좏깮
+          AI_TRANSLATIONS_BACKGROUND: "0"    # ?앹꽦 媛뺤젣
+          AI_TRANSLATIONS_DISABLED: ""       # 李⑤떒 ?댁젣
         run: yarn run generate:translations
 
-      # 선택 1) 생성된 JSON을 저장소에 커밋/푸시 (원하면 주석 해제)
+      # ?좏깮 1) ?앹꽦??JSON????μ냼??而ㅻ컠/?몄떆 (?먰븯硫?二쇱꽍 ?댁젣)
       # - name: Commit generated translations
       #   run: |
       #     git config user.name "github-actions[bot]"
@@ -45,11 +45,12 @@ jobs:
       #     git commit -m "chore: update ai translations" || echo "No changes"
       #     git push
 
-      # 선택 2) 외부 스토리지(S3/Blob 등)에 업로드하고, Vercel 빌드 전에 내려받는 스텝을 추가할 수 있음.
+      # ?좏깮 2) ?몃? ?ㅽ넗由ъ?(S3/Blob ?????낅줈?쒗븯怨? Vercel 鍮뚮뱶 ?꾩뿉 ?대젮諛쏅뒗 ?ㅽ뀦??異붽??????덉쓬.
 
-      # 옵션) 번역 생성 후 Vercel 배포 트리거
+      # ?듭뀡) 踰덉뿭 ?앹꽦 ??Vercel 諛고룷 ?몃━嫄?
       - name: Trigger Vercel Deploy Hook
-        if: ${{ secrets.VERCEL_DEPLOY_HOOK_URL != '' }}
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL != '' }}
         env:
           VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: curl -X POST "$VERCEL_DEPLOY_HOOK_URL"
+
