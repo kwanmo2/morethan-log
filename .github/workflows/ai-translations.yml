@@ -25,7 +25,7 @@ jobs:
         run: corepack enable
 
       - name: Install deps (Yarn)
-        run: yarn install --frozen-lockfile
+        run: yarn install --non-interactive
 
       - name: Generate AI translations
         env:
