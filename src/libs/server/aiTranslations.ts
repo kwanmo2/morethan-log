@@ -31,10 +31,20 @@ const TEXT_PROPERTY_KEYS = ["title", "caption"] as const
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 const TRANSLATION_BATCH_SIZE = 60
 const NOTION_API_VERSION = "2025-09-03"
+const generationAttempts = new Set<string>()
+let backgroundGeneration: Promise<void> | null = null
 const isAiTranslationDisabled = () => {
   const flag = process.env.AI_TRANSLATIONS_DISABLED
   if (!flag) return false
   return ["1", "true", "yes"].includes(flag.toLowerCase())
+}
+
+const shouldDeferGeneration = () => {
+  const forceGenerate =
+    process.env.AI_TRANSLATIONS_BACKGROUND === "0" ||
+    process.env.AI_TRANSLATIONS_FORCE_GENERATE === "1"
+  if (forceGenerate) return false
+  return process.env.VERCEL === "1" || process.env.AI_TRANSLATIONS_BACKGROUND === "1"
 }
 
 type TextSegment = {
@@ -452,7 +462,7 @@ class OpenAiTranslator {
     this.model = model || DEFAULT_OPENAI_MODEL
   }
 
-  private async translateChunk(texts: string[]) {
+  private async translateBatch(texts: string[]) {
     if (!texts.length) return [] as string[]
     const body = {
       model: this.model,
@@ -502,14 +512,11 @@ class OpenAiTranslator {
     }
 
     const translations = parsed?.translations
-    if (!Array.isArray(translations) || translations.length !== texts.length) {
+    if (!Array.isArray(translations)) {
       throw new Error("OpenAI response length mismatch")
     }
 
-    return translations.map((entry: unknown, index: number) => {
-      if (typeof entry === "string" && entry.trim().length > 0) return entry
-      return texts[index]
-    })
+    return translations
   }
 
   private async translateStrings(texts: string[]) {
@@ -520,6 +527,50 @@ class OpenAiTranslator {
       results.push(...translated)
     }
     return results
+  }
+
+  private async translateSingle(text: string) {
+    const [result] = await this.translateBatch([text]).catch(() => [text])
+    return typeof result === "string" && result.trim().length > 0 ? result : text
+  }
+
+  private async translateChunk(texts: string[]) {
+    if (!texts.length) return [] as string[]
+
+    let translations = await this.translateBatch(texts)
+
+    if (!Array.isArray(translations)) {
+      throw new Error("OpenAI response length mismatch")
+    }
+
+    if (translations.length !== texts.length) {
+      console.warn(
+        `[@ai-translation] OpenAI response length mismatch (expected ${texts.length}, received ${translations.length}). Attempting to backfill missing entries.`
+      )
+      const normalized = new Array<string | null>(texts.length).fill(null)
+      texts.forEach((_, index) => {
+        normalized[index] = translations[index] ?? null
+      })
+
+      const results: string[] = []
+      for (let i = 0; i < texts.length; i++) {
+        const entry = normalized[i]
+        if (typeof entry === "string" && entry.trim().length > 0) {
+          results.push(entry)
+          continue
+        }
+
+        const fallback = await this.translateSingle(texts[i])
+        results.push(fallback)
+      }
+      return results
+    }
+
+    return texts.map((text, index) => {
+      const entry = translations[index]
+      if (typeof entry === "string" && entry.trim().length > 0) return entry
+      return text
+    })
   }
 
   async createTranslation(post: TPost) {
@@ -639,6 +690,41 @@ const selectSourcePost = (posts: TPost[]) => {
   )
 }
 
+const generateMissingTranslations = async (
+  pending: { slug: string; post: TPost }[],
+  translator: OpenAiTranslator
+) => {
+  for (const entry of pending) {
+    if (generationAttempts.has(entry.slug)) continue
+    generationAttempts.add(entry.slug)
+    try {
+      const translation = await translator.createTranslation(entry.post)
+      await writeTranslationFile(translation)
+      console.info(
+        `[ai-translation] Generated English draft for "${entry.slug}" using ${translator.model}.`
+      )
+    } catch (error) {
+      console.error(
+        `[ai-translation] Failed to translate "${entry.slug}": ${(error as Error).message}`
+      )
+    }
+  }
+}
+
+const runTranslationPipeline = async (
+  pending: { slug: string; post: TPost }[],
+  translator: OpenAiTranslator,
+  grouped: Map<string, TPost[]>,
+  shouldSyncToNotion: boolean
+) => {
+  await generateMissingTranslations(pending, translator)
+  const refreshedStore = await readStoredTranslations()
+  if (shouldSyncToNotion) {
+    await syncTranslationsToNotionDatabase(grouped, refreshedStore)
+  }
+  return refreshedStore
+}
+
 export const syncAiTranslations = async (posts: TPost[]) => {
   if (isAiTranslationDisabled()) {
     const stored = await readStoredTranslations()
@@ -656,11 +742,21 @@ export const syncAiTranslations = async (posts: TPost[]) => {
   const stored = await readStoredTranslations()
   const grouped = groupPostsBySlug(posts)
   const storedSlugs = new Set(stored.map((entry) => entry.slug))
+  const deferGeneration = shouldDeferGeneration()
+
+  if (deferGeneration) {
+    const translations = stored.map((entry) => entry.translation)
+    console.info(
+      `[@ai-translation] Generation deferred (VERCEL/AI_TRANSLATIONS_BACKGROUND). Serving ${translations.length} stored translations.`
+    )
+    return [...posts, ...translations]
+  }
 
   const pending: { slug: string; post: TPost }[] = []
   grouped.forEach((groupPosts, slug) => {
     if (hasEnglishTranslation(groupPosts)) return
     if (storedSlugs.has(slug)) return
+    if (generationAttempts.has(slug)) return
     const source = selectSourcePost(groupPosts)
     if (!source) return
     pending.push({ slug, post: source })
@@ -675,27 +771,43 @@ export const syncAiTranslations = async (posts: TPost[]) => {
     )
   }
 
+  let resultStore = stored
+
   if (pending.length && apiKey) {
     const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
-    for (const entry of pending) {
-      try {
-        const translation = await translator.createTranslation(entry.post)
-        await writeTranslationFile(translation)
+    const executePipeline = () =>
+      runTranslationPipeline(pending, translator, grouped, true)
+        .then((store) => store)
+
+    if (deferGeneration) {
+      if (!backgroundGeneration) {
+        backgroundGeneration = executePipeline()
+          .then(() => {
+            /* background pipeline finished */
+          })
+          .catch((error) => {
+            console.error(
+              `[@ai-translation] Background translation pipeline failed: ${(error as Error).message}`
+            )
+          })
+          .finally(() => {
+            backgroundGeneration = null
+          })
         console.info(
-          `[ai-translation] Generated English draft for "${entry.slug}" using ${translator.model}.`
-        )
-      } catch (error) {
-        console.error(
-          `[ai-translation] Failed to translate "${entry.slug}": ${(error as Error).message}`
+          "[@ai-translation] Started background English translation generation (non-blocking for build)."
         )
       }
+    } else {
+      resultStore = await executePipeline()
     }
   }
 
-  const updatedStore = await readStoredTranslations()
-  const translations = updatedStore.map((entry) => entry.translation)
+  const pipelineHandledSync = pending.length > 0 && Boolean(apiKey) && !deferGeneration
+  if (!deferGeneration && !pipelineHandledSync) {
+    await syncTranslationsToNotionDatabase(grouped, resultStore)
+  }
 
-  await syncTranslationsToNotionDatabase(grouped, updatedStore)
+  const translations = resultStore.map((entry) => entry.translation)
 
   return [...posts, ...translations]
 }

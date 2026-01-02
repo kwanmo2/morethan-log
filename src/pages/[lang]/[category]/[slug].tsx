@@ -11,7 +11,7 @@ import { queryKey } from "src/constants/queryKey"
 import { dehydrate } from "@tanstack/react-query"
 import usePostQuery from "src/hooks/usePostQuery"
 import { FilterPostsOptions } from "src/libs/utils/notion/filterPosts"
-import { DEFAULT_LANGUAGE } from "src/constants/language"
+import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "src/constants/language"
 import useLanguage from "src/hooks/useLanguage"
 import {
   collectPostContents,
@@ -46,13 +46,27 @@ export const getStaticPaths = async () => {
 
   const paths = mergedPosts.flatMap((post) => {
     const contents = [post, ...(post.translations ?? [])]
-    return contents.map((content) => ({
-      params: {
-        lang: buildLanguageSegment(extractPostLanguage(content)),
-        category: buildCategorySlug(content.category),
-        slug: buildPostSlug(content.slug),
-      },
-    }))
+    const supportedLangs = new Set(
+      SUPPORTED_LANGUAGES.map((lang) => buildLanguageSegment(lang))
+    )
+
+    contents.forEach((content) =>
+      supportedLangs.add(buildLanguageSegment(extractPostLanguage(content)))
+    )
+
+    return Array.from(supportedLangs).map((lang) => {
+      const matched = contents.find(
+        (content) => buildLanguageSegment(extractPostLanguage(content)) === lang
+      )
+      const base = matched ?? post
+      return {
+        params: {
+          lang,
+          category: buildCategorySlug(base.category),
+          slug: buildPostSlug(base.slug),
+        },
+      }
+    })
   })
 
   return {
@@ -99,14 +113,20 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
   const postDetail = detailPosts.find((post) => {
     const contents = [post, ...(post.translations ?? [])]
-    return contents.some((content) => {
-      const languageSegment = buildLanguageSegment(extractPostLanguage(content))
+    const matchesSlugAndCategory = contents.some((content) => {
       return (
         buildPostSlug(content.slug) === normalizedSlug &&
-        buildCategorySlug(content.category) === normalizedCategory &&
-        languageSegment === normalizedLanguage
+        buildCategorySlug(content.category) === normalizedCategory
       )
     })
+    if (!matchesSlugAndCategory) return false
+
+    const hasRequestedLanguage = contents.some(
+      (content) =>
+        buildLanguageSegment(extractPostLanguage(content)) === normalizedLanguage
+    )
+
+    return hasRequestedLanguage || matchesSlugAndCategory
   })
 
   if (!postDetail) {

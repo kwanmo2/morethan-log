@@ -11,7 +11,8 @@
     "build": "next build",
     "start": "next start",
     "postbuild": "next-sitemap --config next-sitemap.config.js",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate:translations": "node scripts/generate-ai-translations.js"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
