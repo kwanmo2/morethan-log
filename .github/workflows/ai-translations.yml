@@ -1,37 +1,43 @@
 name: Generate AI Translations
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:    # 수동 실행
   push:
-    branches: [main]
+    branches: [main]    # 필요에 따라 브랜치 조정
 
 jobs:
   generate-translations:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: "npm"
+          cache: yarn
 
-      - name: Install deps
-        run: npm ci
+      - name: Enable corepack
+        run: corepack enable
 
-      - name: Generate translations (forces generation)
+      - name: Install deps (Yarn)
+        run: yarn install --frozen-lockfile
+
+      - name: Generate AI translations
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}          # 선택
+          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}                # 선택
           NOTION_TRANSLATION_DATABASE_ID: ${{ secrets.NOTION_TRANSLATION_DATABASE_ID }}  # 선택
-          AI_TRANSLATIONS_BACKGROUND: "0"  # 강제 생성
-          AI_TRANSLATIONS_DISABLED: ""     # 생성 차단 해제
-        run: npm run generate:translations
+          AI_TRANSLATIONS_BACKGROUND: "0"    # 생성 강제
+          AI_TRANSLATIONS_DISABLED: ""       # 차단 해제
+        run: yarn run generate:translations
 
-      # 선택 1: 번역 JSON을 저장소에 커밋 (repo가 허용될 때)
-      # - name: Commit translated JSON
+      # 선택 1) 생성된 JSON을 저장소에 커밋/푸시 (원하면 주석 해제)
+      # - name: Commit generated translations
       #   run: |
       #     git config user.name "github-actions[bot]"
       #     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -39,12 +45,11 @@ jobs:
       #     git commit -m "chore: update ai translations" || echo "No changes"
       #     git push
 
-      # 선택 2: S3/Blob 업로드 후 빌드 전에 다운로드 (별도 스텝 추가)
+      # 선택 2) 외부 스토리지(S3/Blob 등)에 업로드하고, Vercel 빌드 전에 내려받는 스텝을 추가할 수 있음.
 
-      # 선택 3: Notion만 외부 저장소로 사용 (pushToNotion은 syncAiTranslations 내부에서 수행)
-
-      - name: Trigger Vercel deploy (optional)
-        if: ${{ env.VERCEL_DEPLOY_HOOK_URL != '' }}
+      # 옵션) 번역 생성 후 Vercel 배포 트리거
+      - name: Trigger Vercel Deploy Hook
+        if: ${{ secrets.VERCEL_DEPLOY_HOOK_URL != '' }}
         env:
           VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: curl -X POST "$VERCEL_DEPLOY_HOOK_URL"
