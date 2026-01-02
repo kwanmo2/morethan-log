@@ -39,9 +39,7 @@ const isAiTranslationDisabled = () => {
   return ["1", "true", "yes"].includes(flag.toLowerCase())
 }
 
-const isVercelBuild = process.env.VERCEL === "1"
-const shouldDeferGeneration = () =>
-  isVercelBuild || process.env.AI_TRANSLATIONS_BACKGROUND === "1"
+const shouldDeferGeneration = () => process.env.AI_TRANSLATIONS_BACKGROUND === "1"
 
 type TextSegment = {
   blockId: string
@@ -458,7 +456,7 @@ class OpenAiTranslator {
     this.model = model || DEFAULT_OPENAI_MODEL
   }
 
-  private async translateChunk(texts: string[]) {
+  private async translateBatch(texts: string[]) {
     if (!texts.length) return [] as string[]
     const body = {
       model: this.model,
@@ -512,17 +510,7 @@ class OpenAiTranslator {
       throw new Error("OpenAI response length mismatch")
     }
 
-    if (translations.length !== texts.length) {
-      console.warn(
-        `[@ai-translation] OpenAI response length mismatch (expected ${texts.length}, received ${translations.length}). Falling back to best-effort mapping.`
-      )
-    }
-
-    return texts.map((text, index) => {
-      const entry = translations[index]
-      if (typeof entry === "string" && entry.trim().length > 0) return entry
-      return text
-    })
+    return translations
   }
 
   private async translateStrings(texts: string[]) {
@@ -533,6 +521,50 @@ class OpenAiTranslator {
       results.push(...translated)
     }
     return results
+  }
+
+  private async translateSingle(text: string) {
+    const [result] = await this.translateBatch([text]).catch(() => [text])
+    return typeof result === "string" && result.trim().length > 0 ? result : text
+  }
+
+  private async translateChunk(texts: string[]) {
+    if (!texts.length) return [] as string[]
+
+    let translations = await this.translateBatch(texts)
+
+    if (!Array.isArray(translations)) {
+      throw new Error("OpenAI response length mismatch")
+    }
+
+    if (translations.length !== texts.length) {
+      console.warn(
+        `[@ai-translation] OpenAI response length mismatch (expected ${texts.length}, received ${translations.length}). Attempting to backfill missing entries.`
+      )
+      const normalized = new Array<string | null>(texts.length).fill(null)
+      texts.forEach((_, index) => {
+        normalized[index] = translations[index] ?? null
+      })
+
+      const results: string[] = []
+      for (let i = 0; i < texts.length; i++) {
+        const entry = normalized[i]
+        if (typeof entry === "string" && entry.trim().length > 0) {
+          results.push(entry)
+          continue
+        }
+
+        const fallback = await this.translateSingle(texts[i])
+        results.push(fallback)
+      }
+      return results
+    }
+
+    return texts.map((text, index) => {
+      const entry = translations[index]
+      if (typeof entry === "string" && entry.trim().length > 0) return entry
+      return text
+    })
   }
 
   async createTranslation(post: TPost) {
