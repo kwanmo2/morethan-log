@@ -39,8 +39,9 @@ const isAiTranslationDisabled = () => {
   return ["1", "true", "yes"].includes(flag.toLowerCase())
 }
 
+const isVercelBuild = process.env.VERCEL === "1"
 const shouldDeferGeneration = () =>
-  process.env.AI_TRANSLATIONS_BACKGROUND === "1"
+  isVercelBuild || process.env.AI_TRANSLATIONS_BACKGROUND === "1"
 
 type TextSegment = {
   blockId: string
@@ -703,6 +704,7 @@ export const syncAiTranslations = async (posts: TPost[]) => {
   const stored = await readStoredTranslations()
   const grouped = groupPostsBySlug(posts)
   const storedSlugs = new Set(stored.map((entry) => entry.slug))
+  const deferGeneration = shouldDeferGeneration()
 
   const pending: { slug: string; post: TPost }[] = []
   grouped.forEach((groupPosts, slug) => {
@@ -724,7 +726,12 @@ export const syncAiTranslations = async (posts: TPost[]) => {
   }
 
   let resultStore = stored
-  const deferGeneration = shouldDeferGeneration()
+
+  if (pending.length && deferGeneration) {
+    console.info(
+      "[@ai-translation] Skipping on-build generation (pending English drafts will be fetched from the store only)."
+    )
+  }
 
   if (pending.length && apiKey) {
     const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
@@ -755,7 +762,7 @@ export const syncAiTranslations = async (posts: TPost[]) => {
     }
   }
 
-  const pipelineHandledSync = pending.length > 0 && Boolean(apiKey)
+  const pipelineHandledSync = pending.length > 0 && Boolean(apiKey) && !deferGeneration
   if (!deferGeneration && !pipelineHandledSync) {
     await syncTranslationsToNotionDatabase(grouped, resultStore)
   }
