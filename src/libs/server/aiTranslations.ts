@@ -39,7 +39,13 @@ const isAiTranslationDisabled = () => {
   return ["1", "true", "yes"].includes(flag.toLowerCase())
 }
 
-const shouldDeferGeneration = () => process.env.AI_TRANSLATIONS_BACKGROUND === "1"
+const shouldDeferGeneration = () => {
+  const forceGenerate =
+    process.env.AI_TRANSLATIONS_BACKGROUND === "0" ||
+    process.env.AI_TRANSLATIONS_FORCE_GENERATE === "1"
+  if (forceGenerate) return false
+  return process.env.VERCEL === "1" || process.env.AI_TRANSLATIONS_BACKGROUND === "1"
+}
 
 type TextSegment = {
   blockId: string
@@ -738,6 +744,14 @@ export const syncAiTranslations = async (posts: TPost[]) => {
   const storedSlugs = new Set(stored.map((entry) => entry.slug))
   const deferGeneration = shouldDeferGeneration()
 
+  if (deferGeneration) {
+    const translations = stored.map((entry) => entry.translation)
+    console.info(
+      `[@ai-translation] Generation deferred (VERCEL/AI_TRANSLATIONS_BACKGROUND). Serving ${translations.length} stored translations.`
+    )
+    return [...posts, ...translations]
+  }
+
   const pending: { slug: string; post: TPost }[] = []
   grouped.forEach((groupPosts, slug) => {
     if (hasEnglishTranslation(groupPosts)) return
@@ -758,12 +772,6 @@ export const syncAiTranslations = async (posts: TPost[]) => {
   }
 
   let resultStore = stored
-
-  if (pending.length && deferGeneration) {
-    console.info(
-      "[@ai-translation] Skipping on-build generation (pending English drafts will be fetched from the store only)."
-    )
-  }
 
   if (pending.length && apiKey) {
     const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
