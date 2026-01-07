@@ -138,24 +138,41 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
   // Fetch recordMaps for all content versions (including AI translations stored in Notion)
   const recordMaps = await Promise.all(
-    contents.map((content) => getRecordMap(content.id))
+    contents.map(async (content) => {
+      try {
+        return await getRecordMap(content.id)
+      } catch (error) {
+        console.warn(
+          `[getStaticProps] Failed to get recordMap for ${content.id}: ${
+            (error as Error).message
+          }`
+        )
+        return null
+      }
+    })
   )
 
   const [baseRecordMap, ...translationRecordMaps] = recordMaps
 
-  const translationsWithRecordMap = (postDetail.translations ?? []).map(
-    (translation, index) => ({
-      ...translation,
-      slug: buildPostSlug(translation.slug),
-      recordMap: translationRecordMaps[index],
+  // Filter out translations that don't have a valid recordMap
+  const translationsWithRecordMap = (postDetail.translations ?? [])
+    .map((translation, index) => {
+      const recordMap = translationRecordMaps[index]
+      if (!recordMap) return null
+      return {
+        ...translation,
+        slug: buildPostSlug(translation.slug),
+        recordMap,
+      }
     })
-  )
+    .filter((t): t is NonNullable<typeof t> => t !== null)
 
   const hydratedPost = {
     ...postDetail,
     slug: buildPostSlug(postDetail.slug),
     recordMap: baseRecordMap,
-    translations: translationsWithRecordMap,
+    translations:
+      translationsWithRecordMap.length > 0 ? translationsWithRecordMap : [],
   }
 
   const postCacheKey = buildPostCacheKey({
