@@ -1,13 +1,14 @@
 name: Generate AI Translations
 
 on:
-  workflow_dispatch:    # ?섎룞 ?ㅽ뻾
-  push:
-    branches: [main]    # ?꾩슂???곕씪 釉뚮옖移?議곗젙
+  workflow_dispatch: # 수동 실행
+  schedule:
+    - cron: "0 0 * * *" # 매일 UTC 00:00 (KST 09:00)
 
 jobs:
   generate-translations:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -18,27 +19,19 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: yarn
 
-      - name: Enable corepack
-        run: corepack enable
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
-      - name: Install deps (Yarn)
-        run: yarn install --non-interactive
-
-      - name: Generate AI translations
+      - name: Generate AI translations & Sync to Notion
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}                # ?좏깮
-          NOTION_TRANSLATION_DATABASE_ID: ${{ secrets.NOTION_TRANSLATION_DATABASE_ID }}  # ?좏깮
-          AI_TRANSLATIONS_BACKGROUND: "0"    # ?앹꽦 媛뺤젣
-          AI_TRANSLATIONS_DISABLED: ""       # 李⑤떒 ?댁젣
-        run: yarn run generate:translations
-        
-      - name: Trigger Vercel Deploy Hook
-        if: env.VERCEL_DEPLOY_HOOK_URL != ''
-        env:
-          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-        run: curl -X POST "$VERCEL_DEPLOY_HOOK_URL"
+          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
+          NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+        run: yarn generate:translations
 
+      - name: Trigger Vercel Deploy
+        if: success() && vars.VERCEL_DEPLOY_HOOK_URL != ''
+        run: curl -X POST "${{ vars.VERCEL_DEPLOY_HOOK_URL }}"

@@ -12,7 +12,7 @@
     "start": "next start",
     "postbuild": "next-sitemap --config next-sitemap.config.js",
     "lint": "next lint",
-    "generate:translations": "node scripts/generate-ai-translations.js"
+    "generate:translations": "tsx scripts/generate-ai-translations.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -34,6 +34,7 @@
     "react-notion-x": "^6.16.0"
   },
   "devDependencies": {
+    "tsx": "^4.7.0",
     "@types/gtag.js": "^0.0.12",
     "@types/node": "^20.17.6",
     "@types/react": "^18.3.12",

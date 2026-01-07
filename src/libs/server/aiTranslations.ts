@@ -1,6 +1,3 @@
-import fs from "node:fs/promises"
-import path from "node:path"
-
 import { ExtendedRecordMap } from "notion-types"
 import { getTextContent } from "notion-utils"
 
@@ -11,41 +8,12 @@ import {
 } from "src/libs/utils/language"
 import { TPost, TPostBase } from "src/types"
 
-const PERSISTENT_TRANSLATIONS_DIR = path.join(
-  process.cwd(),
-  "public",
-  "ai-translations"
-)
-const LEGACY_TRANSLATIONS_DIR = path.join(
-  process.cwd(),
-  "data",
-  "ai-translations"
-)
-const TRANSLATION_DIRECTORIES = [
-  PERSISTENT_TRANSLATIONS_DIR,
-  LEGACY_TRANSLATIONS_DIR,
-]
 const LANGUAGE_CODE = "en"
 const SKIPPED_BLOCK_TYPES = new Set(["code", "equation"])
 const TEXT_PROPERTY_KEYS = ["title", "caption"] as const
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 const TRANSLATION_BATCH_SIZE = 60
-const NOTION_API_VERSION = "2025-09-03"
-const generationAttempts = new Set<string>()
-let backgroundGeneration: Promise<void> | null = null
-const isAiTranslationDisabled = () => {
-  const flag = process.env.AI_TRANSLATIONS_DISABLED
-  if (!flag) return false
-  return ["1", "true", "yes"].includes(flag.toLowerCase())
-}
-
-const shouldDeferGeneration = () => {
-  const forceGenerate =
-    process.env.AI_TRANSLATIONS_BACKGROUND === "0" ||
-    process.env.AI_TRANSLATIONS_FORCE_GENERATE === "1"
-  if (forceGenerate) return false
-  return process.env.VERCEL === "1" || process.env.AI_TRANSLATIONS_BACKGROUND === "1"
-}
+const NOTION_API_VERSION = "2022-06-28"
 
 type TextSegment = {
   blockId: string
@@ -54,21 +22,16 @@ type TextSegment = {
   text: string
 }
 
-type TranslationMetadata = {
-  slug: string
-  sourcePostId: string
-  generatedAt: string
-  model: string
+type TranslationResult = {
   translation: TPost
   recordMap: ExtendedRecordMap
+  sourcePostId: string
 }
 
 type NotionSyncConfig = {
   apiToken: string
   databaseId: string
 }
-
-let cachedTranslations: TranslationMetadata[] | null = null
 
 const cloneRecordMap = (recordMap: ExtendedRecordMap): ExtendedRecordMap => {
   if (typeof structuredClone === "function") {
@@ -77,99 +40,9 @@ const cloneRecordMap = (recordMap: ExtendedRecordMap): ExtendedRecordMap => {
   return JSON.parse(JSON.stringify(recordMap))
 }
 
-const sanitizeFileName = (slug: string) => slug.replace(/[^a-zA-Z0-9-_]/g, "-")
-
-const buildFilePath = (directory: string, slug: string) =>
-  path.join(directory, `${sanitizeFileName(slug)}-${LANGUAGE_CODE}.json`)
-
-const ensureDirectory = async (directory: string) => {
-  await fs.mkdir(directory, { recursive: true })
-}
-
-const readDirectoryTranslations = async (directory: string) => {
-  try {
-    const files = await fs.readdir(directory)
-    const jsonFiles = files.filter((file) => file.endsWith(".json"))
-    return Promise.all(
-      jsonFiles.map(async (file) => {
-        const fullPath = path.join(directory, file)
-        const raw = await fs.readFile(fullPath, "utf8")
-        return JSON.parse(raw) as TranslationMetadata
-      })
-    )
-  } catch (error) {
-    const nodeError = error as NodeJS.ErrnoException
-    if (nodeError.code === "ENOENT" || nodeError.code === "EROFS") {
-      return []
-    }
-    throw error
-  }
-}
-
-const readStoredTranslations = async () => {
-  if (cachedTranslations) return cachedTranslations
-
-  const collected = new Map<string, TranslationMetadata>()
-
-  for (const directory of TRANSLATION_DIRECTORIES) {
-    const translations = await readDirectoryTranslations(directory)
-    translations.forEach((entry) => {
-      const key = entry.translation?.id || entry.slug
-      if (!key || collected.has(key)) return
-      collected.set(key, entry)
-    })
-  }
-
-  const merged = Array.from(collected.values())
-  cachedTranslations = merged
-  return merged
-}
-
-const writeTranslationFile = async (translation: TranslationMetadata) => {
-  try {
-    await ensureDirectory(PERSISTENT_TRANSLATIONS_DIR)
-    const persistentPath = buildFilePath(
-      PERSISTENT_TRANSLATIONS_DIR,
-      translation.slug
-    )
-    await fs.writeFile(
-      persistentPath,
-      JSON.stringify(translation, null, 2),
-      "utf8"
-    )
-  } catch (error) {
-    console.warn(
-      `[@ai-translation] Unable to write persistent translation file: ${(error as Error).message}`
-    )
-  }
-
-  try {
-    await ensureDirectory(LEGACY_TRANSLATIONS_DIR)
-    const legacyPath = buildFilePath(LEGACY_TRANSLATIONS_DIR, translation.slug)
-    await fs.writeFile(
-      legacyPath,
-      JSON.stringify(translation, null, 2),
-      "utf8"
-    )
-  } catch (error) {
-    console.warn(
-      `[@ai-translation] Unable to write legacy translation file: ${(error as Error).message}`
-    )
-  }
-
-  cachedTranslations = cachedTranslations
-    ? [
-        ...cachedTranslations.filter(
-          (entry) => entry.translation.id !== translation.translation.id
-        ),
-        translation,
-      ]
-    : [translation]
-}
-
 const getNotionSyncConfig = (): NotionSyncConfig | null => {
   const apiToken = process.env.NOTION_API_TOKEN
-  const databaseId = process.env.NOTION_TRANSLATION_DATABASE_ID || process.env.NOTION_PAGE_ID
+  const databaseId = process.env.NOTION_PAGE_ID
 
   if (!apiToken || !databaseId) return null
 
@@ -178,7 +51,9 @@ const getNotionSyncConfig = (): NotionSyncConfig | null => {
 
 const buildRichText = (text?: string) => {
   if (!text?.trim()) return null
-  return [{ type: "text", text: { content: text } }]
+  // Notion API limits rich_text content to 2000 characters
+  const truncated = text.length > 2000 ? text.slice(0, 2000) : text
+  return [{ type: "text", text: { content: truncated } }]
 }
 
 const buildChildrenFromRecordMap = (
@@ -291,6 +166,22 @@ const buildChildrenFromRecordMap = (
           ...withChildren,
         },
       ]
+    case "code":
+      // Preserve code blocks without translation
+      if (!blockValue.properties?.title) return children
+      const codeText = getTextContent(blockValue.properties.title)
+      const language = blockValue.properties?.language?.[0]?.[0] || "plain text"
+      return [
+        {
+          type: "code",
+          code: {
+            rich_text: buildRichText(codeText) ?? [],
+            language: language.toLowerCase(),
+          },
+        },
+      ]
+    case "divider":
+      return [{ type: "divider", divider: {} }]
     default:
       return children
   }
@@ -299,7 +190,9 @@ const buildChildrenFromRecordMap = (
 const normalizeProperties = (post: TPost) => {
   const properties: Record<string, unknown> = {
     title: {
-      title: buildRichText(post.title) ?? [{ type: "text", text: { content: "" } }],
+      title: buildRichText(post.title) ?? [
+        { type: "text", text: { content: "" } },
+      ],
     },
   }
 
@@ -311,21 +204,24 @@ const normalizeProperties = (post: TPost) => {
     properties.summary = { rich_text: buildRichText(post.summary) ?? [] }
   }
 
-  if (post.language?.length) {
-    properties.language = {
-      multi_select: post.language
-        .map((lang) => normalizeLanguageCode(lang))
-        .filter((lang): lang is string => Boolean(lang))
-        .map((lang) => ({ name: lang })),
+  // Always set language to English for translated posts
+  properties.language = {
+    multi_select: [{ name: "en" }],
+  }
+
+  // Mark as AI translation
+  properties.isAiTranslation = { checkbox: true }
+
+  if (post.type?.length) {
+    properties.type = {
+      multi_select: post.type.map((entry) => ({ name: entry })),
     }
   }
 
-  if (post.type?.length) {
-    properties.type = { multi_select: post.type.map((entry) => ({ name: entry })) }
-  }
-
   if (post.tags?.length) {
-    properties.tags = { multi_select: post.tags.map((entry) => ({ name: entry })) }
+    properties.tags = {
+      multi_select: post.tags.map((entry) => ({ name: entry })),
+    }
   }
 
   if (post.category?.length) {
@@ -335,7 +231,9 @@ const normalizeProperties = (post: TPost) => {
   }
 
   if (post.status?.length) {
-    properties.status = { multi_select: post.status.map((entry) => ({ name: entry })) }
+    properties.status = {
+      multi_select: post.status.map((entry) => ({ name: entry })),
+    }
   }
 
   if (post.date?.start_date) {
@@ -350,8 +248,6 @@ const notionRequest = async <T>(
   apiToken: string,
   options: RequestInit
 ): Promise<T> => {
-  // The Notion API enforces versioned requests; align with the 2025-09-03 upgrade.
-  const NOTION_API_VERSION = "2025-09-03"
   const response = await fetch(`https://api.notion.com/v1/${path}`, {
     ...options,
     headers: {
@@ -370,18 +266,66 @@ const notionRequest = async <T>(
   return (await response.json()) as T
 }
 
+const checkExistingEnglishTranslation = async (
+  slug: string,
+  config: NotionSyncConfig
+): Promise<boolean> => {
+  try {
+    const response = await notionRequest<{ results: any[] }>(
+      `databases/${config.databaseId}/query`,
+      config.apiToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          filter: {
+            and: [
+              { property: "slug", rich_text: { equals: slug } },
+              { property: "language", multi_select: { contains: "en" } },
+            ],
+          },
+        }),
+      }
+    )
+    return response.results.length > 0
+  } catch (error) {
+    console.warn(
+      `[ai-translation] Failed to check existing translation for "${slug}": ${(error as Error).message}`
+    )
+    return false
+  }
+}
+
+const chunkArray = <T>(values: T[], size: number) => {
+  const chunks: T[][] = []
+  for (let i = 0; i < values.length; i += size) {
+    chunks.push(values.slice(i, i + size))
+  }
+  return chunks
+}
+
 const publishTranslationToNotion = async (
-  translation: TranslationMetadata,
+  result: TranslationResult,
   config: NotionSyncConfig
 ) => {
-  const rootBlock = translation.recordMap.block?.[translation.sourcePostId]?.value
-  if (!rootBlock?.content?.length) return
+  const rootBlock = result.recordMap.block?.[result.sourcePostId]?.value
+  if (!rootBlock?.content?.length) {
+    // Create page without content blocks
+    const properties = normalizeProperties(result.translation)
+    await notionRequest<{ id: string }>("pages", config.apiToken, {
+      method: "POST",
+      body: JSON.stringify({
+        parent: { database_id: config.databaseId },
+        properties,
+      }),
+    })
+    return
+  }
 
   const children = rootBlock.content.flatMap((childId: string) =>
-    buildChildrenFromRecordMap(translation.recordMap, childId)
+    buildChildrenFromRecordMap(result.recordMap, childId)
   )
 
-  const properties = normalizeProperties(translation.translation)
+  const properties = normalizeProperties(result.translation)
 
   const page = await notionRequest<{ id: string }>("pages", config.apiToken, {
     method: "POST",
@@ -391,6 +335,7 @@ const publishTranslationToNotion = async (
     }),
   })
 
+  // Notion API limits appending to 100 blocks at a time
   const chunkedChildren = chunkArray(children, 100)
   for (const chunk of chunkedChildren) {
     if (!chunk.length) continue
@@ -445,14 +390,6 @@ const applyTranslationsToRecordMap = (
   return clone
 }
 
-const chunkArray = <T,>(values: T[], size: number) => {
-  const chunks: T[][] = []
-  for (let i = 0; i < values.length; i += size) {
-    chunks.push(values.slice(i, i + size))
-  }
-  return chunks
-}
-
 class OpenAiTranslator {
   private readonly apiKey: string
   readonly model: string
@@ -476,10 +413,9 @@ class OpenAiTranslator {
         },
         {
           role: "user",
-          content:
-            `Translate each entry of this JSON array into English. Do not wrap the response in Markdown fences. Return a JSON object with a \"translations\" array that mirrors the input length. Input: ${JSON.stringify(
-              texts
-            )}`,
+          content: `Translate each entry of this JSON array into English. Do not wrap the response in Markdown fences. Return a JSON object with a "translations" array that mirrors the input length. Input: ${JSON.stringify(
+            texts
+          )}`,
         },
       ],
     }
@@ -508,7 +444,9 @@ class OpenAiTranslator {
     try {
       parsed = JSON.parse(content)
     } catch (error) {
-      throw new Error(`Failed to parse OpenAI response: ${(error as Error).message}`)
+      throw new Error(
+        `Failed to parse OpenAI response: ${(error as Error).message}`
+      )
     }
 
     const translations = parsed?.translations
@@ -531,13 +469,15 @@ class OpenAiTranslator {
 
   private async translateSingle(text: string) {
     const [result] = await this.translateBatch([text]).catch(() => [text])
-    return typeof result === "string" && result.trim().length > 0 ? result : text
+    return typeof result === "string" && result.trim().length > 0
+      ? result
+      : text
   }
 
   private async translateChunk(texts: string[]) {
     if (!texts.length) return [] as string[]
 
-    let translations = await this.translateBatch(texts)
+    const translations = await this.translateBatch(texts)
 
     if (!Array.isArray(translations)) {
       throw new Error("OpenAI response length mismatch")
@@ -545,7 +485,7 @@ class OpenAiTranslator {
 
     if (translations.length !== texts.length) {
       console.warn(
-        `[@ai-translation] OpenAI response length mismatch (expected ${texts.length}, received ${translations.length}). Attempting to backfill missing entries.`
+        `[ai-translation] OpenAI response length mismatch (expected ${texts.length}, received ${translations.length}). Attempting to backfill missing entries.`
       )
       const normalized = new Array<string | null>(texts.length).fill(null)
       texts.forEach((_, index) => {
@@ -573,7 +513,7 @@ class OpenAiTranslator {
     })
   }
 
-  async createTranslation(post: TPost) {
+  async createTranslation(post: TPost): Promise<TranslationResult> {
     if (!post.slug) {
       throw new Error("Post slug is required for translation")
     }
@@ -615,7 +555,7 @@ class OpenAiTranslator {
 
     const translatedTitle = translationMap.get(base.title) ?? base.title
     const translatedSummary = base.summary
-      ? translationMap.get(base.summary) ?? base.summary
+      ? (translationMap.get(base.summary) ?? base.summary)
       : undefined
 
     const translationPost: TPost = {
@@ -627,47 +567,20 @@ class OpenAiTranslator {
       isAiTranslation: true,
     }
 
-    const file: TranslationMetadata = {
-      slug: post.slug,
-      sourcePostId: post.id,
-      generatedAt: new Date().toISOString(),
-      model: this.model,
+    return {
       translation: translationPost,
       recordMap: translatedRecordMap,
+      sourcePostId: post.id,
     }
-
-    return file
   }
 }
 
 const hasEnglishTranslation = (posts: TPost[]) => {
   return posts.some((post) =>
-    (post.language ?? []).some((language) => normalizeLanguageCode(language) === LANGUAGE_CODE)
+    (post.language ?? []).some(
+      (language) => normalizeLanguageCode(language) === LANGUAGE_CODE
+    )
   )
-}
-
-const syncTranslationsToNotionDatabase = async (
-  grouped: Map<string, TPost[]>,
-  stored: TranslationMetadata[]
-) => {
-  const config = getNotionSyncConfig()
-  if (!config) return
-
-  for (const [slug, posts] of grouped.entries()) {
-    if (hasEnglishTranslation(posts)) continue
-
-    const translation = stored.find((entry) => entry.slug === slug)
-    if (!translation) continue
-
-    try {
-      await publishTranslationToNotion(translation, config)
-      console.info(`[@ai-translation] Synced English draft for "${slug}" to Notion.`)
-    } catch (error) {
-      console.error(
-        `[@ai-translation] Failed to sync "${slug}" to Notion: ${(error as Error).message}`
-      )
-    }
-  }
 }
 
 const groupPostsBySlug = (posts: TPost[]) => {
@@ -684,136 +597,84 @@ const groupPostsBySlug = (posts: TPost[]) => {
   return grouped
 }
 
-const selectSourcePost = (posts: TPost[]) => {
+const selectKoreanOnlyPost = (posts: TPost[]): TPost | null => {
   return (
-    posts.find((post) => normalizeLanguageCode(post.language?.[0]) !== LANGUAGE_CODE) || posts[0]
+    posts.find((post) => {
+      const lang = post.language?.[0]
+      // Skip if language is empty (user requested to ignore these)
+      if (!lang) return false
+      return normalizeLanguageCode(lang) === "ko"
+    }) || null
   )
 }
 
-const generateMissingTranslations = async (
-  pending: { slug: string; post: TPost }[],
-  translator: OpenAiTranslator
-) => {
-  for (const entry of pending) {
-    if (generationAttempts.has(entry.slug)) continue
-    generationAttempts.add(entry.slug)
-    try {
-      const translation = await translator.createTranslation(entry.post)
-      await writeTranslationFile(translation)
+export const syncAiTranslations = async (posts: TPost[]) => {
+  // Skip translation sync on Vercel builds - translations are created via GitHub Actions
+  // and already exist in the Notion database
+  if (process.env.VERCEL === "1") {
+    return posts
+  }
+
+  const config = getNotionSyncConfig()
+  if (!config) {
+    console.warn(
+      "[ai-translation] Missing NOTION_API_TOKEN or NOTION_PAGE_ID. Skipping sync."
+    )
+    return posts
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    console.warn("[ai-translation] Missing OPENAI_API_KEY. Skipping sync.")
+    return posts
+  }
+
+  const grouped = groupPostsBySlug(posts)
+  const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
+  let translatedCount = 0
+  let skippedCount = 0
+
+  for (const [slug, groupPosts] of grouped.entries()) {
+    // Skip if already has English translation in the fetched posts
+    if (hasEnglishTranslation(groupPosts)) {
+      continue
+    }
+
+    // Find Korean-only post (skip if language is empty)
+    const source = selectKoreanOnlyPost(groupPosts)
+    if (!source) {
+      continue
+    }
+
+    // Check if English version already exists in Notion DB
+    const existsInNotion = await checkExistingEnglishTranslation(slug, config)
+    if (existsInNotion) {
       console.info(
-        `[ai-translation] Generated English draft for "${entry.slug}" using ${translator.model}.`
+        `[ai-translation] Skipped "${slug}" - English version already exists in Notion`
+      )
+      skippedCount++
+      continue
+    }
+
+    // Generate translation and publish to Notion
+    try {
+      console.info(`[ai-translation] Translating "${slug}"...`)
+      const result = await translator.createTranslation(source)
+      await publishTranslationToNotion(result, config)
+      translatedCount++
+      console.info(
+        `[ai-translation] Created English version for "${slug}" in Notion`
       )
     } catch (error) {
       console.error(
-        `[ai-translation] Failed to translate "${entry.slug}": ${(error as Error).message}`
+        `[ai-translation] Failed to translate "${slug}": ${(error as Error).message}`
       )
     }
   }
-}
 
-const runTranslationPipeline = async (
-  pending: { slug: string; post: TPost }[],
-  translator: OpenAiTranslator,
-  grouped: Map<string, TPost[]>,
-  shouldSyncToNotion: boolean
-) => {
-  await generateMissingTranslations(pending, translator)
-  const refreshedStore = await readStoredTranslations()
-  if (shouldSyncToNotion) {
-    await syncTranslationsToNotionDatabase(grouped, refreshedStore)
-  }
-  return refreshedStore
-}
+  console.info(
+    `[ai-translation] Summary: ${translatedCount} translated, ${skippedCount} skipped (already exists)`
+  )
 
-export const syncAiTranslations = async (posts: TPost[]) => {
-  if (isAiTranslationDisabled()) {
-    const stored = await readStoredTranslations()
-    if (!stored.length) {
-      console.info("[ai-translation] Skipped. Set AI_TRANSLATIONS_DISABLED=false to enable.")
-      return posts
-    }
-    console.info(
-      `[@ai-translation] Skipped generation due to AI_TRANSLATIONS_DISABLED. Serving ${stored.length} stored translations.`
-    )
-    const translations = stored.map((entry) => entry.translation)
-    return [...posts, ...translations]
-  }
-
-  const stored = await readStoredTranslations()
-  const grouped = groupPostsBySlug(posts)
-  const storedSlugs = new Set(stored.map((entry) => entry.slug))
-  const deferGeneration = shouldDeferGeneration()
-
-  if (deferGeneration) {
-    const translations = stored.map((entry) => entry.translation)
-    console.info(
-      `[@ai-translation] Generation deferred (VERCEL/AI_TRANSLATIONS_BACKGROUND). Serving ${translations.length} stored translations.`
-    )
-    return [...posts, ...translations]
-  }
-
-  const pending: { slug: string; post: TPost }[] = []
-  grouped.forEach((groupPosts, slug) => {
-    if (hasEnglishTranslation(groupPosts)) return
-    if (storedSlugs.has(slug)) return
-    if (generationAttempts.has(slug)) return
-    const source = selectSourcePost(groupPosts)
-    if (!source) return
-    pending.push({ slug, post: source })
-  })
-
-  const apiKey = process.env.OPENAI_API_KEY
-  if (pending.length && !apiKey) {
-    console.warn(
-      `[ai-translation] Missing OPENAI_API_KEY. Unable to generate English versions for: ${pending
-        .map((entry) => entry.slug)
-        .join(", ")}`
-    )
-  }
-
-  let resultStore = stored
-
-  if (pending.length && apiKey) {
-    const translator = new OpenAiTranslator(apiKey, process.env.OPENAI_MODEL)
-    const executePipeline = () =>
-      runTranslationPipeline(pending, translator, grouped, true)
-        .then((store) => store)
-
-    if (deferGeneration) {
-      if (!backgroundGeneration) {
-        backgroundGeneration = executePipeline()
-          .then(() => {
-            /* background pipeline finished */
-          })
-          .catch((error) => {
-            console.error(
-              `[@ai-translation] Background translation pipeline failed: ${(error as Error).message}`
-            )
-          })
-          .finally(() => {
-            backgroundGeneration = null
-          })
-        console.info(
-          "[@ai-translation] Started background English translation generation (non-blocking for build)."
-        )
-      }
-    } else {
-      resultStore = await executePipeline()
-    }
-  }
-
-  const pipelineHandledSync = pending.length > 0 && Boolean(apiKey) && !deferGeneration
-  if (!deferGeneration && !pipelineHandledSync) {
-    await syncTranslationsToNotionDatabase(grouped, resultStore)
-  }
-
-  const translations = resultStore.map((entry) => entry.translation)
-
-  return [...posts, ...translations]
-}
-
-export const loadAiTranslationRecordMap = async (translationId: string) => {
-  const translations = await readStoredTranslations()
-  const match = translations.find((entry) => entry.translation.id === translationId)
-  return match?.recordMap ?? null
+  return posts
 }

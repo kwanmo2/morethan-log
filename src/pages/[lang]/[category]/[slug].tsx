@@ -18,10 +18,7 @@ import {
   selectContentByLanguage,
   extractPostLanguage,
 } from "src/libs/utils/language"
-import {
-  loadAiTranslationRecordMap,
-  syncAiTranslations,
-} from "src/libs/server/aiTranslations"
+import { syncAiTranslations } from "src/libs/server/aiTranslations"
 import {
   buildCategorySlug,
   buildPostPath,
@@ -123,7 +120,8 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
     const hasRequestedLanguage = contents.some(
       (content) =>
-        buildLanguageSegment(extractPostLanguage(content)) === normalizedLanguage
+        buildLanguageSegment(extractPostLanguage(content)) ===
+        normalizedLanguage
     )
 
     return hasRequestedLanguage || matchesSlugAndCategory
@@ -138,25 +136,12 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
   const contents = [postDetail, ...(postDetail.translations ?? [])]
 
+  // Fetch recordMaps for all content versions (including AI translations stored in Notion)
   const recordMaps = await Promise.all(
-    contents.map((content) => {
-      if (content.isAiTranslation) {
-        return loadAiTranslationRecordMap(content.id)
-      }
-      return getRecordMap(content.id)
-    })
+    contents.map((content) => getRecordMap(content.id))
   )
 
-  const ensuredRecordMaps = recordMaps.map((recordMap, index) => {
-    if (!recordMap) {
-      throw new Error(
-        `Missing recordMap for ${contents[index].title}. Regenerate AI translations to continue.`
-      )
-    }
-    return recordMap
-  })
-
-  const [baseRecordMap, ...translationRecordMaps] = ensuredRecordMaps
+  const [baseRecordMap, ...translationRecordMaps] = recordMaps
 
   const translationsWithRecordMap = (postDetail.translations ?? []).map(
     (translation, index) => ({
@@ -179,7 +164,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
     language: normalizedLanguage,
   })
 
-  await queryClient.prefetchQuery(queryKey.post(postCacheKey), () => hydratedPost)
+  await queryClient.prefetchQuery(
+    queryKey.post(postCacheKey),
+    () => hydratedPost
+  )
 
   return {
     props: {
@@ -218,7 +206,9 @@ const DetailPage: NextPageWithLayout = () => {
     activeContent.thumbnail ??
     post.thumbnail ??
     CONFIG.ogImageGenerateURL ??
-    `${CONFIG.ogImageGenerateURL}/${encodeURIComponent(activeContent.title)}.png`
+    `${CONFIG.ogImageGenerateURL}/${encodeURIComponent(
+      activeContent.title
+    )}.png`
 
   const date =
     activeContent.date?.start_date ||
