@@ -204,17 +204,13 @@ const normalizeProperties = (post: TPost) => {
     properties.summary = { rich_text: buildRichText(post.summary) ?? [] }
   }
 
-  // Always set language to English for translated posts
   properties.language = {
     multi_select: [{ name: "en" }],
   }
 
-  // Mark as AI translation
-  properties.isAiTranslation = { checkbox: true }
-
   if (post.type?.length) {
     properties.type = {
-      multi_select: post.type.map((entry) => ({ name: entry })),
+      select: { name: post.type[0] },
     }
   }
 
@@ -226,13 +222,13 @@ const normalizeProperties = (post: TPost) => {
 
   if (post.category?.length) {
     properties.category = {
-      multi_select: post.category.map((entry) => ({ name: entry })),
+      select: { name: post.category[0] },
     }
   }
 
   if (post.status?.length) {
     properties.status = {
-      multi_select: post.status.map((entry) => ({ name: entry })),
+      select: { name: post.status[0] },
     }
   }
 
