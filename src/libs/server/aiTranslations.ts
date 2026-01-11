@@ -286,6 +286,18 @@ const checkExistingEnglishTranslation = async (
         }),
       }
     )
+
+    if (response.results.length > 0) {
+      console.log(`[DEBUG] Found existing "en" post for slug "${slug}":`)
+      response.results.forEach((r) =>
+        console.log(
+          ` - ID: ${r.id}, URL: ${r.url}, Title: ${
+            r.properties?.title?.title?.[0]?.plain_text || "(No Title)"
+          }`
+        )
+      )
+    }
+
     return response.results.length > 0
   } catch (error) {
     console.warn(
