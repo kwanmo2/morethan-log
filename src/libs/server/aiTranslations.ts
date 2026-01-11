@@ -268,7 +268,8 @@ const notionRequest = async <T>(
 
 const checkExistingEnglishTranslation = async (
   slug: string,
-  config: NotionSyncConfig
+  config: NotionSyncConfig,
+  excludeId?: string
 ): Promise<boolean> => {
   try {
     const response = await notionRequest<{ results: any[] }>(
@@ -287,18 +288,27 @@ const checkExistingEnglishTranslation = async (
       }
     )
 
-    if (response.results.length > 0) {
+    // Filter out the source post itself if found
+    const matches = response.results.filter(
+      (page) =>
+        !excludeId || page.id.replace(/-/g, "") !== excludeId.replace(/-/g, "")
+    )
+
+    if (matches.length > 0) {
       console.log(`[DEBUG] Found existing "en" post for slug "${slug}":`)
-      response.results.forEach((r) =>
+      matches.forEach((r) => {
+        const title =
+          r.properties?.title?.title?.[0]?.plain_text || "(No Title)"
+        const languages = r.properties?.language?.multi_select
+          ?.map((l: any) => l.name)
+          .join(", ")
         console.log(
-          ` - ID: ${r.id}, URL: ${r.url}, Title: ${
-            r.properties?.title?.title?.[0]?.plain_text || "(No Title)"
-          }`
+          ` - ID: ${r.id}\n   Title: ${title}\n   Languages: [${languages}]\n   URL: ${r.url}`
         )
-      )
+      })
     }
 
-    return response.results.length > 0
+    return matches.length > 0
   } catch (error) {
     console.warn(
       `[ai-translation] Failed to check existing translation for "${slug}": ${(error as Error).message}`
@@ -659,7 +669,11 @@ export const syncAiTranslations = async (posts: TPost[]) => {
     }
 
     // Check if English version already exists in Notion DB
-    const existsInNotion = await checkExistingEnglishTranslation(slug, config)
+    const existsInNotion = await checkExistingEnglishTranslation(
+      slug,
+      config,
+      source.id
+    )
     if (existsInNotion) {
       console.info(
         `[ai-translation] Skipped "${slug}" - English version already exists in Notion`
