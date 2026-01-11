@@ -205,7 +205,7 @@ const normalizeProperties = (post: TPost) => {
   }
 
   properties.language = {
-    multi_select: [{ name: "en" }],
+    multi_select: [{ name: "eng" }],
   }
 
   if (post.type?.length) {
