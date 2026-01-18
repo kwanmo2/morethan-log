@@ -9,7 +9,7 @@ import {
 import { TPost, TPostBase } from "src/types"
 
 const LANGUAGE_CODE = "en"
-const SKIPPED_BLOCK_TYPES = new Set(["code", "equation"])
+const SKIPPED_BLOCK_TYPES = new Set(["code", "equation", "bookmark"])
 const TEXT_PROPERTY_KEYS = ["title", "caption"] as const
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 const TRANSLATION_BATCH_SIZE = 60
@@ -177,6 +177,20 @@ const buildChildrenFromRecordMap = (
           code: {
             rich_text: buildRichText(codeText) ?? [],
             language: language.toLowerCase(),
+          },
+        },
+      ]
+    case "bookmark":
+      // Preserve bookmark blocks without translation
+      const bookmarkUrl = getTextContent(blockValue.properties?.link || [])
+      if (!bookmarkUrl) return children
+      const bookmarkCaption = getTextContent(blockValue.properties?.caption || [])
+      return [
+        {
+          type: "bookmark",
+          bookmark: {
+            url: bookmarkUrl,
+            ...(bookmarkCaption ? { caption: buildRichText(bookmarkCaption) } : {}),
           },
         },
       ]
