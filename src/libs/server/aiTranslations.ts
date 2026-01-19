@@ -367,6 +367,56 @@ const BLOCKS_WITH_CHILDREN_SUPPORT = new Set([
   "callout",
 ])
 
+const isValidNotionBlock = (block: any): boolean => {
+  if (!block || typeof block !== "object" || Array.isArray(block)) return false
+  const blockType = block.type
+  if (typeof blockType !== "string") return false
+  if (!SUPPORTED_BLOCK_TYPES.has(blockType)) return false
+  const content = block[blockType]
+  if (!content || typeof content !== "object") return false
+  return true
+}
+
+const sanitizeBlocksForNotion = (blocks: any[]): any[] => {
+  const sanitized: any[] = []
+
+  for (const block of blocks) {
+    if (!isValidNotionBlock(block)) {
+      // If block is invalid but has children, try to salvage them
+      if (block?.children && Array.isArray(block.children)) {
+        sanitized.push(...sanitizeBlocksForNotion(block.children))
+      }
+      continue
+    }
+
+    const sanitizedBlock: any = {
+      type: block.type,
+      [block.type]: block[block.type],
+    }
+
+    // Only add children if block type supports them AND children are valid
+    if (
+      block.children &&
+      Array.isArray(block.children) &&
+      BLOCKS_WITH_CHILDREN_SUPPORT.has(block.type)
+    ) {
+      const sanitizedChildren = sanitizeBlocksForNotion(block.children)
+      if (sanitizedChildren.length) {
+        sanitizedBlock.children = sanitizedChildren
+      }
+    } else if (block.children && Array.isArray(block.children)) {
+      // Block doesn't support children - add them as siblings instead
+      sanitized.push(sanitizedBlock)
+      sanitized.push(...sanitizeBlocksForNotion(block.children))
+      continue
+    }
+
+    sanitized.push(sanitizedBlock)
+  }
+
+  return sanitized
+}
+
 const normalizeChildren = (blocks: any[]) => {
   const normalized: any[] = []
 
@@ -437,11 +487,14 @@ const publishTranslationToNotion = async (
     return
   }
 
-  const children = normalizeChildren(
+  const rawChildren = normalizeChildren(
     rootBlock.content.flatMap((childId: string) =>
       buildChildrenFromRecordMap(result.recordMap, childId)
     )
   )
+
+  // Final sanitization to ensure all blocks are valid for Notion API
+  const children = sanitizeBlocksForNotion(rawChildren)
 
   const properties = normalizeProperties(result.translation)
 
