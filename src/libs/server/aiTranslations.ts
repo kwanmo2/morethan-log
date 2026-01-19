@@ -341,28 +341,63 @@ const chunkArray = <T>(values: T[], size: number) => {
   return chunks
 }
 
+const SUPPORTED_BLOCK_TYPES = new Set([
+  "paragraph",
+  "heading_1",
+  "heading_2",
+  "heading_3",
+  "bulleted_list_item",
+  "numbered_list_item",
+  "quote",
+  "toggle",
+  "to_do",
+  "callout",
+  "code",
+  "bookmark",
+  "divider",
+])
+
 const normalizeChildren = (blocks: any[]) => {
   const normalized: any[] = []
 
   blocks.forEach((block) => {
     if (!block || typeof block !== "object") return
 
-    if (typeof block.type === "string") {
-      const { children, ...rest } = block
-      if (Array.isArray(children)) {
-        const nested = normalizeChildren(children)
-        if (nested.length) {
-          normalized.push({ ...rest, children: nested })
-          return
-        }
-      }
-      normalized.push(rest)
+    if (Array.isArray(block)) {
+      normalized.push(...normalizeChildren(block))
       return
     }
 
-    if (Array.isArray(block.children)) {
-      normalized.push(...normalizeChildren(block.children))
+    const children = Array.isArray(block.children)
+      ? normalizeChildren(block.children)
+      : []
+    const blockType = typeof block.type === "string" ? block.type : null
+
+    if (!blockType || !SUPPORTED_BLOCK_TYPES.has(blockType)) {
+      if (children.length) {
+        normalized.push(...children)
+      }
+      return
     }
+
+    const content = block[blockType]
+    if (!content) {
+      if (children.length) {
+        normalized.push(...children)
+      }
+      return
+    }
+
+    const nextBlock: any = {
+      type: blockType,
+      [blockType]: content,
+    }
+
+    if (children.length) {
+      nextBlock.children = children
+    }
+
+    normalized.push(nextBlock)
   })
 
   return normalized
