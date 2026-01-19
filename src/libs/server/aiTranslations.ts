@@ -357,6 +357,16 @@ const SUPPORTED_BLOCK_TYPES = new Set([
   "divider",
 ])
 
+// Block types that support nested children in Notion API
+const BLOCKS_WITH_CHILDREN_SUPPORT = new Set([
+  "bulleted_list_item",
+  "numbered_list_item",
+  "toggle",
+  "to_do",
+  "quote",
+  "callout",
+])
+
 const normalizeChildren = (blocks: any[]) => {
   const normalized: any[] = []
 
@@ -393,8 +403,14 @@ const normalizeChildren = (blocks: any[]) => {
       [blockType]: content,
     }
 
-    if (children.length) {
+    // Only add children to block types that support them in Notion API
+    if (children.length && BLOCKS_WITH_CHILDREN_SUPPORT.has(blockType)) {
       nextBlock.children = children
+    } else if (children.length) {
+      // For blocks that don't support children, append children as siblings
+      normalized.push(nextBlock)
+      normalized.push(...children)
+      return
     }
 
     normalized.push(nextBlock)
