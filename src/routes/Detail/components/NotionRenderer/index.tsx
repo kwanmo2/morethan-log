@@ -46,6 +46,11 @@ const Modal = dynamic(
   }
 )
 
+const LinkCardWrapper = dynamic(
+  () => import("src/components/LinkCardWrapper").then((m) => m.default),
+  { ssr: false }
+)
+
 const mapPageUrl = (id: string) => {
   return "https://www.notion.so/" + id.replace(/-/g, "")
 }
@@ -58,20 +63,22 @@ const NotionRenderer: FC<Props> = ({ recordMap }) => {
   const [scheme] = useScheme()
   return (
     <StyledWrapper>
-      <_NotionRenderer
-        darkMode={scheme === "dark"}
-        recordMap={recordMap}
-        components={{
-          Code,
-          Collection,
-          Equation,
-          Modal,
-          Pdf,
-          nextImage: Image,
-          nextLink: Link,
-        }}
-        mapPageUrl={mapPageUrl}
-      />
+      <LinkCardWrapper>
+        <_NotionRenderer
+          darkMode={scheme === "dark"}
+          recordMap={recordMap}
+          components={{
+            Code,
+            Collection,
+            Equation,
+            Modal,
+            Pdf,
+            nextImage: Image,
+            nextLink: Link,
+          }}
+          mapPageUrl={mapPageUrl}
+        />
+      </LinkCardWrapper>
     </StyledWrapper>
   )
 }

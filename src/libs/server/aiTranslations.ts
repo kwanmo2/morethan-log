@@ -184,13 +184,17 @@ const buildChildrenFromRecordMap = (
       // Preserve bookmark blocks without translation
       const bookmarkUrl = getTextContent(blockValue.properties?.link || [])
       if (!bookmarkUrl) return children
-      const bookmarkCaption = getTextContent(blockValue.properties?.caption || [])
+      const bookmarkCaption = getTextContent(
+        blockValue.properties?.caption || []
+      )
       return [
         {
           type: "bookmark",
           bookmark: {
             url: bookmarkUrl,
-            ...(bookmarkCaption ? { caption: buildRichText(bookmarkCaption) } : {}),
+            ...(bookmarkCaption
+              ? { caption: buildRichText(bookmarkCaption) }
+              : {}),
           },
         },
       ]
@@ -321,7 +325,9 @@ const checkExistingEnglishTranslation = async (
     return matches.length > 0
   } catch (error) {
     console.warn(
-      `[ai-translation] Failed to check existing translation for "${slug}": ${(error as Error).message}`
+      `[ai-translation] Failed to check existing translation for "${slug}": ${
+        (error as Error).message
+      }`
     )
     return false
   }
@@ -333,6 +339,33 @@ const chunkArray = <T>(values: T[], size: number) => {
     chunks.push(values.slice(i, i + size))
   }
   return chunks
+}
+
+const normalizeChildren = (blocks: any[]) => {
+  const normalized: any[] = []
+
+  blocks.forEach((block) => {
+    if (!block || typeof block !== "object") return
+
+    if (typeof block.type === "string") {
+      const { children, ...rest } = block
+      if (Array.isArray(children)) {
+        const nested = normalizeChildren(children)
+        if (nested.length) {
+          normalized.push({ ...rest, children: nested })
+          return
+        }
+      }
+      normalized.push(rest)
+      return
+    }
+
+    if (Array.isArray(block.children)) {
+      normalized.push(...normalizeChildren(block.children))
+    }
+  })
+
+  return normalized
 }
 
 const publishTranslationToNotion = async (
@@ -353,8 +386,10 @@ const publishTranslationToNotion = async (
     return
   }
 
-  const children = rootBlock.content.flatMap((childId: string) =>
-    buildChildrenFromRecordMap(result.recordMap, childId)
+  const children = normalizeChildren(
+    rootBlock.content.flatMap((childId: string) =>
+      buildChildrenFromRecordMap(result.recordMap, childId)
+    )
   )
 
   const properties = normalizeProperties(result.translation)
@@ -587,7 +622,7 @@ class OpenAiTranslator {
 
     const translatedTitle = translationMap.get(base.title) ?? base.title
     const translatedSummary = base.summary
-      ? (translationMap.get(base.summary) ?? base.summary)
+      ? translationMap.get(base.summary) ?? base.summary
       : undefined
 
     const translationPost: TPost = {
@@ -703,7 +738,9 @@ export const syncAiTranslations = async (posts: TPost[]) => {
       )
     } catch (error) {
       console.error(
-        `[ai-translation] Failed to translate "${slug}": ${(error as Error).message}`
+        `[ai-translation] Failed to translate "${slug}": ${
+          (error as Error).message
+        }`
       )
     }
   }
