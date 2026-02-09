@@ -102,7 +102,7 @@ export const runRedisCommand = async (
       Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ command }),
+    body: JSON.stringify(command),
   })
 
   const payload = await response.json()
@@ -121,13 +121,14 @@ export const runRedisPipeline = async (
     return commands.map((command) => executeInMemory(command))
   }
 
-  const response = await fetch(UPSTASH_REDIS_REST_URL as string, {
+  const pipelineUrl = `${(UPSTASH_REDIS_REST_URL as string).replace(/\/+$/, "")}/pipeline`
+  const response = await fetch(pipelineUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ commands }),
+    body: JSON.stringify(commands),
   })
 
   const payload = await response.json()
@@ -136,5 +137,5 @@ export const runRedisPipeline = async (
     throw new Error(payload.error || "Failed to execute redis pipeline")
   }
 
-  return normalizeResult(payload.results ?? payload.result ?? [])
+  return normalizeResult(payload)
 }
