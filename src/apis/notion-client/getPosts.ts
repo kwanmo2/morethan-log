@@ -33,7 +33,8 @@ export const getPosts = async () => {
   }
 
   id = idToUuid(id)
-  const collection = Object.values(response.collection)[0]?.value
+  const collectionData = Object.values(response.collection)[0]?.value as any
+  const collection = collectionData?.value || collectionData
   const block = response.block
   const schema = collection?.schema
 
