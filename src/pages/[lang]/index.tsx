@@ -4,7 +4,7 @@ import { CONFIG } from "../../../site.config"
 import { NextPageWithLayout } from "src/types"
 import { getPosts } from "src/apis"
 import MetaConfig from "src/components/MetaConfig"
-import { queryClient } from "src/libs/react-query"
+import { createQueryClient } from "src/libs/react-query"
 import { queryKey } from "src/constants/queryKey"
 import { dehydrate } from "@tanstack/react-query"
 import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
@@ -23,6 +23,7 @@ export const getStaticPaths: GetStaticPaths = () => {
 }
 
 export const getStaticProps: GetStaticProps = async (context) => {
+  const queryClient = createQueryClient()
   const langParam = context.params?.lang
 
   if (!langParam || Array.isArray(langParam)) {
@@ -65,14 +66,33 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({ language: languageProp })
   }, [languageProp, router.query.lang, setLanguage])
 
   const meta = useMemo(() => {
-    const path = `/${buildLanguageSegment(language)}`
+    const normalizedLanguage = buildLanguageSegment(language)
+    const path = `/${normalizedLanguage}`
+    const alternates = SUPPORTED_LANGUAGES.map((lang) => {
+      const langSegment = buildLanguageSegment(lang)
+      return {
+        hrefLang: langSegment,
+        href: getCanonicalUrl(`/${langSegment}`, CONFIG.link),
+      }
+    })
+
     return {
       title: `${CONFIG.blog.title} (${language.toUpperCase()})`,
       description: CONFIG.blog.description,
       type: "Website",
       url: getCanonicalUrl(path, CONFIG.link),
       canonical: path,
-      language,
+      language: normalizedLanguage,
+      alternates: [
+        ...alternates,
+        {
+          hrefLang: "x-default",
+          href: getCanonicalUrl(
+            `/${buildLanguageSegment(DEFAULT_LANGUAGE)}`,
+            CONFIG.link
+          ),
+        },
+      ],
     }
   }, [language])
 

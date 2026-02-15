@@ -13,6 +13,11 @@ export type MetaConfigProps = {
   canonical?: string
   keywords?: string[]
   language?: string
+  noindex?: boolean
+  alternates?: {
+    hrefLang: string
+    href: string
+  }[]
 }
 
 const MetaConfig: React.FC<MetaConfigProps> = (props) => {
@@ -23,13 +28,21 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
   return (
     <Head>
       <title>{props.title}</title>
-      <meta name="robots" content="follow, index" />
+      <meta name="robots" content={props.noindex ? "noindex, follow" : "index, follow"} />
       <meta charSet="UTF-8" />
       <meta name="description" content={props.description} />
       <meta name="keywords" content={props.keywords?.join(", ") ?? CONFIG.blog.title} />
       <meta name="author" content={CONFIG.profile.name} />
       <meta name="application-name" content={CONFIG.blog.title} />
       <link rel="canonical" href={canonicalUrl} />
+      {props.alternates?.map((alternate) => (
+        <link
+          key={`${alternate.hrefLang}:${alternate.href}`}
+          rel="alternate"
+          hrefLang={alternate.hrefLang}
+          href={alternate.href}
+        />
+      ))}
       {/* og */}
       <meta property="og:type" content={props.type} />
       <meta property="og:title" content={props.title} />
