@@ -13,6 +13,7 @@ export type MetaConfigProps = {
   canonical?: string
   keywords?: string[]
   language?: string
+  noindex?: boolean
 }
 
 const MetaConfig: React.FC<MetaConfigProps> = (props) => {
@@ -23,7 +24,7 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
   return (
     <Head>
       <title>{props.title}</title>
-      <meta name="robots" content="follow, index" />
+      <meta name="robots" content={props.noindex ? "noindex, follow" : "index, follow"} />
       <meta charSet="UTF-8" />
       <meta name="description" content={props.description} />
       <meta name="keywords" content={props.keywords?.join(", ") ?? CONFIG.blog.title} />

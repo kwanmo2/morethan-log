@@ -108,33 +108,85 @@ export const getStaticProps: GetStaticProps = async (context) => {
     DEFAULT_LANGUAGE
   )
 
-  const postDetail = detailPosts.find((post) => {
+  const matchedPost = detailPosts.find((post) => {
     const contents = [post, ...(post.translations ?? [])]
-    const matchesSlugAndCategory = contents.some((content) => {
+    return contents.some((content) => {
+      const isSameLanguage =
+        buildLanguageSegment(extractPostLanguage(content)) ===
+        normalizedLanguage
+
+      if (!isSameLanguage) return false
+
       return (
         buildPostSlug(content.slug) === normalizedSlug &&
         buildCategorySlug(content.category) === normalizedCategory
       )
     })
-    if (!matchesSlugAndCategory) return false
-
-    const hasRequestedLanguage = contents.some(
-      (content) =>
-        buildLanguageSegment(extractPostLanguage(content)) ===
-        normalizedLanguage
-    )
-
-    return hasRequestedLanguage || matchesSlugAndCategory
   })
 
-  if (!postDetail) {
+  if (!matchedPost) {
+    const fallbackMatchedPost = detailPosts.find((post) => {
+      const contents = [post, ...(post.translations ?? [])]
+      return contents.some((content) => {
+        return (
+          buildPostSlug(content.slug) === normalizedSlug &&
+          buildCategorySlug(content.category) === normalizedCategory
+        )
+      })
+    })
+
+    if (fallbackMatchedPost) {
+      const contents = [fallbackMatchedPost, ...(fallbackMatchedPost.translations ?? [])]
+      const requestedLanguageContent = contents.find(
+        (content) =>
+          buildLanguageSegment(extractPostLanguage(content)) ===
+          normalizedLanguage
+      )
+
+      const redirectContent = requestedLanguageContent ?? contents[0]
+      const redirectLanguage = buildLanguageSegment(
+        extractPostLanguage(redirectContent)
+      )
+      const destination = buildPostPath(redirectContent, redirectLanguage)
+
+      return {
+        redirect: {
+          destination,
+          permanent: true,
+        },
+        revalidate: CONFIG.revalidateTime,
+      }
+    }
+
     return {
       notFound: true,
       revalidate: CONFIG.revalidateTime,
     }
   }
 
-  const contents = [postDetail, ...(postDetail.translations ?? [])]
+  const matchedContents = [matchedPost, ...(matchedPost.translations ?? [])]
+  const normalizedPathForRequestedLanguage = buildPostPath(
+    matchedContents.find(
+      (content) =>
+        buildLanguageSegment(extractPostLanguage(content)) ===
+        normalizedLanguage
+    ) ?? matchedPost,
+    normalizedLanguage
+  )
+
+  const requestedPath = `/${normalizedLanguage}/${normalizedCategory}/${normalizedSlug}`
+  if (normalizedPathForRequestedLanguage !== requestedPath) {
+    return {
+      redirect: {
+        destination: normalizedPathForRequestedLanguage,
+        permanent: true,
+      },
+      revalidate: CONFIG.revalidateTime,
+    }
+  }
+
+  const postDetail = matchedPost
+  const contents = matchedContents
 
   // Fetch recordMaps for all content versions (including AI translations stored in Notion)
   const recordMaps = await Promise.all(
@@ -232,7 +284,10 @@ const DetailPage: NextPageWithLayout = () => {
     activeContent.createdTime ||
     post.createdTime
 
-  const path = buildPostPath(post, pathLanguage ?? language)
+  const canonicalLanguage = buildLanguageSegment(
+    extractPostLanguage(activeContent) ?? pathLanguage ?? language
+  )
+  const canonicalPath = buildPostPath(activeContent, canonicalLanguage)
 
   const meta = {
     title: activeContent.title,
@@ -240,10 +295,10 @@ const DetailPage: NextPageWithLayout = () => {
     image,
     description: activeContent.summary || post.summary || "",
     type: activeContent.type[0],
-    url: getCanonicalUrl(path, CONFIG.link),
-    canonical: path,
+    url: getCanonicalUrl(canonicalPath, CONFIG.link),
+    canonical: canonicalPath,
     keywords: activeContent.tags ?? post.tags ?? [],
-    language: pathLanguage ?? language,
+    language: canonicalLanguage,
   }
 
   return (
