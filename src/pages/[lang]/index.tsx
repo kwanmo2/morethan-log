@@ -65,14 +65,33 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({ language: languageProp })
   }, [languageProp, router.query.lang, setLanguage])
 
   const meta = useMemo(() => {
-    const path = `/${buildLanguageSegment(language)}`
+    const normalizedLanguage = buildLanguageSegment(language)
+    const path = `/${normalizedLanguage}`
+    const alternates = SUPPORTED_LANGUAGES.map((lang) => {
+      const langSegment = buildLanguageSegment(lang)
+      return {
+        hrefLang: langSegment,
+        href: getCanonicalUrl(`/${langSegment}`, CONFIG.link),
+      }
+    })
+
     return {
       title: `${CONFIG.blog.title} (${language.toUpperCase()})`,
       description: CONFIG.blog.description,
       type: "Website",
       url: getCanonicalUrl(path, CONFIG.link),
       canonical: path,
-      language,
+      language: normalizedLanguage,
+      alternates: [
+        ...alternates,
+        {
+          hrefLang: "x-default",
+          href: getCanonicalUrl(
+            `/${buildLanguageSegment(DEFAULT_LANGUAGE)}`,
+            CONFIG.link
+          ),
+        },
+      ],
     }
   }, [language])
 

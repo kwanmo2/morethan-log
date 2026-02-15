@@ -68,7 +68,7 @@ export const getStaticPaths = async () => {
 
   return {
     paths,
-    fallback: true,
+    fallback: "blocking",
   }
 }
 
@@ -286,6 +286,27 @@ const DetailPage: NextPageWithLayout = () => {
     extractPostLanguage(activeContent) ?? pathLanguage ?? language
   )
   const canonicalPath = buildPostPath(activeContent, canonicalLanguage)
+  const alternateUrlMap = contents.reduce((acc, content) => {
+    const lang = buildLanguageSegment(
+      extractPostLanguage(content) ?? canonicalLanguage
+    )
+    if (!acc.has(lang)) {
+      acc.set(lang, getCanonicalUrl(buildPostPath(content, lang), CONFIG.link))
+    }
+    return acc
+  }, new Map<string, string>())
+
+  const alternates = Array.from(alternateUrlMap.entries()).map(
+    ([hrefLang, href]) => ({
+      hrefLang,
+      href,
+    })
+  )
+
+  const defaultLanguage = buildLanguageSegment(DEFAULT_LANGUAGE)
+  const defaultAlternateHref =
+    alternateUrlMap.get(defaultLanguage) ??
+    getCanonicalUrl(canonicalPath, CONFIG.link)
 
   const meta = {
     title: activeContent.title,
@@ -297,6 +318,13 @@ const DetailPage: NextPageWithLayout = () => {
     canonical: canonicalPath,
     keywords: activeContent.tags ?? post.tags ?? [],
     language: canonicalLanguage,
+    alternates: [
+      ...alternates,
+      {
+        hrefLang: "x-default",
+        href: defaultAlternateHref,
+      },
+    ],
   }
 
   return (

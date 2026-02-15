@@ -14,6 +14,10 @@ export type MetaConfigProps = {
   keywords?: string[]
   language?: string
   noindex?: boolean
+  alternates?: {
+    hrefLang: string
+    href: string
+  }[]
 }
 
 const MetaConfig: React.FC<MetaConfigProps> = (props) => {
@@ -31,6 +35,14 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
       <meta name="author" content={CONFIG.profile.name} />
       <meta name="application-name" content={CONFIG.blog.title} />
       <link rel="canonical" href={canonicalUrl} />
+      {props.alternates?.map((alternate) => (
+        <link
+          key={`${alternate.hrefLang}:${alternate.href}`}
+          rel="alternate"
+          hrefLang={alternate.hrefLang}
+          href={alternate.href}
+        />
+      ))}
       {/* og */}
       <meta property="og:type" content={props.type} />
       <meta property="og:title" content={props.title} />
