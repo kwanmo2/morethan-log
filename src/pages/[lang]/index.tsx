@@ -4,7 +4,7 @@ import { CONFIG } from "../../../site.config"
 import { NextPageWithLayout } from "src/types"
 import { getPosts } from "src/apis"
 import MetaConfig from "src/components/MetaConfig"
-import { queryClient } from "src/libs/react-query"
+import { createQueryClient } from "src/libs/react-query"
 import { queryKey } from "src/constants/queryKey"
 import { dehydrate } from "@tanstack/react-query"
 import { filterPosts, mergePostsByLanguage } from "src/libs/utils/notion"
@@ -23,6 +23,7 @@ export const getStaticPaths: GetStaticPaths = () => {
 }
 
 export const getStaticProps: GetStaticProps = async (context) => {
+  const queryClient = createQueryClient()
   const langParam = context.params?.lang
 
   if (!langParam || Array.isArray(langParam)) {
