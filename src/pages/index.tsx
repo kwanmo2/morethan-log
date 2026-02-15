@@ -1,18 +1,20 @@
-import { GetStaticProps } from "next"
+import Head from "next/head"
 import { DEFAULT_LANGUAGE } from "src/constants/language"
 import { buildLanguageSegment } from "src/libs/utils/paths"
+import { CONFIG } from "site.config"
 
-export const getStaticProps: GetStaticProps = async () => {
+const IndexPage = () => {
   const redirectTo = `/${buildLanguageSegment(DEFAULT_LANGUAGE)}`
+  const canonical = `${CONFIG.link.replace(/\/+$/, "")}${redirectTo}`
 
-  return {
-    redirect: {
-      destination: redirectTo,
-      permanent: true,
-    },
-  }
+  return (
+    <Head>
+      <title>{CONFIG.blog.title}</title>
+      <meta name="robots" content="noindex, follow" />
+      <link rel="canonical" href={canonical} />
+      <meta httpEquiv="refresh" content={`0;url=${redirectTo}`} />
+    </Head>
+  )
 }
-
-const IndexPage = () => null
 
 export default IndexPage

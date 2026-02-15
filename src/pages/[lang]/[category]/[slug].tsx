@@ -154,7 +154,6 @@ export const getStaticProps: GetStaticProps = async (context) => {
           destination,
           permanent: true,
         },
-        revalidate: CONFIG.revalidateTime,
       }
     }
 
@@ -181,7 +180,6 @@ export const getStaticProps: GetStaticProps = async (context) => {
         destination: normalizedPathForRequestedLanguage,
         permanent: true,
       },
-      revalidate: CONFIG.revalidateTime,
     }
   }
 
