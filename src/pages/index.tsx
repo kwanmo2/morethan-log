@@ -1,7 +1,5 @@
 import Head from "next/head"
 import { GetStaticProps, NextPage } from "next"
-import { useRouter } from "next/router"
-import { useEffect } from "react"
 import { DEFAULT_LANGUAGE } from "src/constants/language"
 import { buildLanguageSegment } from "src/libs/utils/paths"
 
@@ -13,22 +11,17 @@ export const getStaticProps: GetStaticProps<IndexPageProps> = async () => {
   const redirectTo = `/${buildLanguageSegment(DEFAULT_LANGUAGE)}`
 
   return {
-    props: {
-      redirectTo,
+    redirect: {
+      destination: redirectTo,
+      permanent: true,
     },
   }
 }
 
-const FeedPage: NextPage<IndexPageProps> = ({ redirectTo }) => {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace(redirectTo)
-  }, [redirectTo, router])
-
+const FeedPage: NextPage<IndexPageProps> = () => {
   return (
     <Head>
-      <meta httpEquiv="refresh" content={`0;url=${redirectTo}`} />
+      <meta name="robots" content="noindex, follow" />
     </Head>
   )
 }

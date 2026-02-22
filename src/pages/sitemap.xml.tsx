@@ -41,14 +41,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     changefreq: "daily",
   }))
 
-  // Include the site root separately
-  fields.unshift({
-    loc: CONFIG.link,
-    lastmod: new Date().toISOString(),
-    priority: 1.0,
-    changefreq: "daily",
-  })
-
   return getServerSideSitemap(ctx, fields)
 }
 
