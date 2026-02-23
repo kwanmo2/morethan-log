@@ -43,19 +43,29 @@ export const getStaticPaths = async () => {
 
   const paths = mergedPosts.flatMap((post) => {
     const contents = [post, ...(post.translations ?? [])]
-    const supportedLangs = new Set(
-      SUPPORTED_LANGUAGES.map((lang) => buildLanguageSegment(lang))
-    )
+    const contentByLanguage = contents.reduce((acc, content) => {
+      const language = buildLanguageSegment(extractPostLanguage(content))
 
-    contents.forEach((content) =>
-      supportedLangs.add(buildLanguageSegment(extractPostLanguage(content)))
-    )
+      if (
+        !SUPPORTED_LANGUAGES.includes(
+          language as (typeof SUPPORTED_LANGUAGES)[number]
+        )
+      ) {
+        return acc
+      }
 
-    return Array.from(supportedLangs).map((lang) => {
-      const matched = contents.find(
-        (content) => buildLanguageSegment(extractPostLanguage(content)) === lang
-      )
-      const base = matched ?? post
+      if (!acc.has(language)) {
+        acc.set(language, content)
+      }
+
+      return acc
+    }, new Map<string, (typeof contents)[number]>())
+
+    if (contentByLanguage.size === 0) {
+      contentByLanguage.set(buildLanguageSegment(DEFAULT_LANGUAGE), post)
+    }
+
+    return Array.from(contentByLanguage.entries()).map(([lang, base]) => {
       return {
         params: {
           lang,
@@ -95,6 +105,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const normalizedSlug = buildPostSlug(slugParam)
   const normalizedCategory = buildCategorySlug([categoryParam])
   const normalizedLanguage = buildLanguageSegment(langParam)
+  queryClient.setQueryData(queryKey.language(), normalizedLanguage)
 
   const posts = await getPosts()
   const postsWithTranslations = await syncAiTranslations(posts)
@@ -240,33 +251,46 @@ export const getStaticProps: GetStaticProps = async (context) => {
   return {
     props: {
       dehydratedState: dehydrate(queryClient),
+      language: normalizedLanguage,
     },
     revalidate: CONFIG.revalidateTime,
   }
 }
 
-const DetailPage: NextPageWithLayout = () => {
+type DetailPageProps = {
+  language: string
+}
+
+const DetailPage: NextPageWithLayout<DetailPageProps> = ({ language: languageProp }) => {
   const post = usePostQuery()
-  const [language, setLanguage] = useLanguage()
+  const [, setLanguage] = useLanguage()
   const router = useRouter()
+  const routeLanguage = useMemo(
+    () => buildLanguageSegment(languageProp),
+    [languageProp]
+  )
   const pathLanguage = useMemo(() => {
     const langParam = router.query.lang
     if (typeof langParam !== "string") return undefined
     return buildLanguageSegment(langParam)
   }, [router.query.lang])
+  const activeLanguage = pathLanguage ?? routeLanguage
 
   useEffect(() => {
     if (pathLanguage) {
       setLanguage(pathLanguage)
+      return
     }
-  }, [pathLanguage, setLanguage])
+
+    setLanguage(routeLanguage)
+  }, [pathLanguage, routeLanguage, setLanguage])
 
   if (!post) return <CustomError />
 
   const contents = collectPostContents(post)
   const activeContent = selectContentByLanguage(
     contents,
-    pathLanguage ?? language,
+    activeLanguage,
     DEFAULT_LANGUAGE
   )
 
@@ -284,7 +308,7 @@ const DetailPage: NextPageWithLayout = () => {
     post.createdTime
 
   const canonicalLanguage = buildLanguageSegment(
-    extractPostLanguage(activeContent) ?? pathLanguage ?? language
+    extractPostLanguage(activeContent) ?? activeLanguage
   )
   const canonicalPath = buildPostPath(activeContent, canonicalLanguage)
   const alternateUrlMap = contents.reduce((acc, content) => {

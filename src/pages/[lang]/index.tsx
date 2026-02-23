@@ -36,12 +36,14 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const postsWithTranslations = await syncAiTranslations(posts)
   const filteredPosts = filterPosts(postsWithTranslations)
   const mergedPosts = mergePostsByLanguage(filteredPosts, DEFAULT_LANGUAGE)
+  const normalizedLanguage = buildLanguageSegment(langParam)
+  queryClient.setQueryData(queryKey.language(), normalizedLanguage)
   await queryClient.prefetchQuery(queryKey.posts(), () => mergedPosts)
 
   return {
     props: {
       dehydratedState: dehydrate(queryClient),
-      language: buildLanguageSegment(langParam),
+      language: normalizedLanguage,
     },
     revalidate: CONFIG.revalidateTime,
   }
@@ -52,8 +54,12 @@ type FeedPageProps = {
 }
 
 const FeedPage: NextPageWithLayout<FeedPageProps> = ({ language: languageProp }) => {
-  const [language, setLanguage] = useLanguage()
+  const [, setLanguage] = useLanguage()
   const router = useRouter()
+  const routeLanguage = useMemo(
+    () => buildLanguageSegment(languageProp),
+    [languageProp]
+  )
 
   useEffect(() => {
     const langParam = router.query.lang
@@ -62,12 +68,11 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({ language: languageProp })
       return
     }
 
-    setLanguage(languageProp)
-  }, [languageProp, router.query.lang, setLanguage])
+    setLanguage(routeLanguage)
+  }, [routeLanguage, router.query.lang, setLanguage])
 
   const meta = useMemo(() => {
-    const normalizedLanguage = buildLanguageSegment(language)
-    const path = `/${normalizedLanguage}`
+    const path = `/${routeLanguage}`
     const alternates = SUPPORTED_LANGUAGES.map((lang) => {
       const langSegment = buildLanguageSegment(lang)
       return {
@@ -77,12 +82,12 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({ language: languageProp })
     })
 
     return {
-      title: `${CONFIG.blog.title} (${language.toUpperCase()})`,
+      title: `${CONFIG.blog.title} (${routeLanguage.toUpperCase()})`,
       description: CONFIG.blog.description,
       type: "Website",
       url: getCanonicalUrl(path, CONFIG.link),
       canonical: path,
-      language: normalizedLanguage,
+      language: routeLanguage,
       alternates: [
         ...alternates,
         {
@@ -94,7 +99,7 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({ language: languageProp })
         },
       ],
     }
-  }, [language])
+  }, [routeLanguage])
 
   return (
     <>
