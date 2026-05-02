@@ -1,7 +1,7 @@
 import { getTextContent, getDateValue } from "notion-utils"
-import { NotionAPI } from "notion-client"
 import { BlockMap, CollectionPropertySchemaMap } from "notion-types"
 import { customMapImageUrl } from "./customMapImageUrl"
+import { createNotionApi } from "src/apis/notion-client/createNotionApi"
 import {
   ensureLanguageArray,
   normalizeLanguageCode,
@@ -12,10 +12,12 @@ async function getPageProperties(
   block: BlockMap,
   schema: CollectionPropertySchemaMap
 ) {
-  const api = new NotionAPI()
+  const api = createNotionApi()
   // Handle nested value structure (Notion API response change)
   const blockData = block?.[id]?.value as any
   const blockValue = blockData?.value || blockData
+  if (!blockValue) return null
+
   const rawProperties = Object.entries(blockValue?.properties || [])
   const excludeProperties = ["date", "select", "multi_select", "person", "file"]
   const properties: any = {}

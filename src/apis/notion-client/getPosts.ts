@@ -1,7 +1,7 @@
 import { CONFIG } from "site.config"
-import { NotionAPI } from "notion-client"
 import { idToUuid } from "notion-utils"
 
+import { createNotionApi } from "./createNotionApi"
 import getAllPageIds from "src/libs/utils/notion/getAllPageIds"
 import getPageProperties from "src/libs/utils/notion/getPageProperties"
 import { TPosts } from "src/types"
@@ -19,7 +19,7 @@ export const getPosts = async () => {
     )
     return []
   }
-  const api = new NotionAPI()
+  const api = createNotionApi()
 
   let response
   try {
@@ -27,16 +27,32 @@ export const getPosts = async () => {
   } catch (error) {
     console.error(
       `[@notion] Failed to load database ${id}: ${(error as Error).message}`,
-      "Check that the Notion integration still has access and that any required tokens are set (NOTION_TOKEN or NOTION_API_TOKEN)."
+      "Check that the Notion page is shared to web or that NOTION_TOKEN is set for notion-client access."
     )
     return []
   }
 
   id = idToUuid(id)
+  if (!response.collection || !response.collection_query) {
+    console.error(
+      `[@notion] Database ${id} loaded without collection data.`,
+      "Verify NOTION_PAGE_ID points to the Share to Web database view page and that the page/database is accessible."
+    )
+    return []
+  }
+
   const collectionData = Object.values(response.collection)[0]?.value as any
   const collection = collectionData?.value || collectionData
   const block = response.block
   const schema = collection?.schema
+
+  if (!schema) {
+    console.error(
+      `[@notion] Database ${id} loaded without a collection schema.`,
+      "Verify the Notion database view and its properties are accessible."
+    )
+    return []
+  }
 
   // Handle nested value structure (Notion API response change)
   const getBlockValue = (blockData: any) => {
@@ -64,6 +80,7 @@ export const getPosts = async () => {
   for (let i = 0; i < pageIds.length; i++) {
     const id = pageIds[i]
     const properties = (await getPageProperties(id, block, schema)) || null
+    if (!properties) continue
     // Add fullwidth, createdtime to properties
     const blockValue = getBlockValue(block[id])
     properties.createdTime = new Date(blockValue?.created_time).toString()
