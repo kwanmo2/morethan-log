@@ -1,4 +1,5 @@
 import { createNotionApi } from "./createNotionApi"
+import { normalizeRecordMap } from "./normalizeRecordMap"
 import { withNotionRetry } from "./withNotionRetry"
 
 const recordMapCache = new Map<string, Promise<any>>()
@@ -15,7 +16,8 @@ export const getRecordMap = async (pageId: string) => {
   recordMapCache.set(pageId, request)
 
   try {
-    return await request
+    const recordMap = await request
+    return normalizeRecordMap(recordMap)
   } catch (error) {
     recordMapCache.delete(pageId)
     console.error(

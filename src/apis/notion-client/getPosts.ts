@@ -5,6 +5,7 @@ import { createNotionApi } from "./createNotionApi"
 import getAllPageIds from "src/libs/utils/notion/getAllPageIds"
 import getPageProperties from "src/libs/utils/notion/getPageProperties"
 import { TPosts } from "src/types"
+import { normalizeRecordMap } from "./normalizeRecordMap"
 import { withNotionRetry } from "./withNotionRetry"
 
 const getRecordValue = (record: any) => {
@@ -38,8 +39,8 @@ const fetchPosts = async () => {
 
   let response
   try {
-    response = await withNotionRetry(`load database ${id}`, () =>
-      api.getPage(id)
+    response = normalizeRecordMap(
+      await withNotionRetry(`load database ${id}`, () => api.getPage(id))
     )
   } catch (error) {
     console.error(
@@ -72,21 +73,25 @@ const fetchPosts = async () => {
       )
       const reducerResults = (collectionData.result as any)?.reducerResults
 
+      const normalizedCollectionRecordMap = normalizeRecordMap(
+        collectionData.recordMap
+      )
+
       response.block = {
         ...response.block,
-        ...collectionData.recordMap.block,
+        ...normalizedCollectionRecordMap.block,
       }
       response.collection = {
         ...response.collection,
-        ...collectionData.recordMap.collection,
+        ...normalizedCollectionRecordMap.collection,
       }
       response.collection_view = {
         ...response.collection_view,
-        ...collectionData.recordMap.collection_view,
+        ...normalizedCollectionRecordMap.collection_view,
       }
       response.notion_user = {
         ...response.notion_user,
-        ...collectionData.recordMap.notion_user,
+        ...normalizedCollectionRecordMap.notion_user,
       }
       response.collection_query = {
         ...response.collection_query,

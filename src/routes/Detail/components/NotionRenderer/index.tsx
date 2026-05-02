@@ -46,7 +46,8 @@ const Modal = dynamic(
   }
 )
 
-const mapPageUrl = (id: string) => {
+const mapPageUrl = (id?: string) => {
+  if (!id) return "https://www.notion.so"
   return "https://www.notion.so/" + id.replace(/-/g, "")
 }
 
@@ -56,6 +57,8 @@ type Props = {
 
 const NotionRenderer: FC<Props> = ({ recordMap }) => {
   const [scheme] = useScheme()
+  if (!recordMap?.block) return null
+
   return (
     <StyledWrapper>
       <_NotionRenderer

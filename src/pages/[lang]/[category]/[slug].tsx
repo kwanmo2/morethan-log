@@ -36,33 +36,8 @@ const filter: FilterPostsOptions = {
 }
 
 export const getStaticPaths = async () => {
-  const posts = await getPosts()
-  const postsWithTranslations = await syncAiTranslations(posts)
-  const filteredPost = filterPosts(postsWithTranslations, filter)
-  const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
-  const pathMap = new Map<string, { params: { lang: string; category: string; slug: string } }>()
-
-  mergedPosts.forEach((post) => {
-    const contents = [post, ...(post.translations ?? [])]
-
-    contents.forEach((content) => {
-      const lang = buildLanguageSegment(extractPostLanguage(content))
-      const path = {
-        params: {
-          lang,
-          category: buildCategorySlug(content.category),
-          slug: buildPostSlug(content.slug),
-        },
-      }
-      pathMap.set(
-        `${path.params.lang}/${path.params.category}/${path.params.slug}`,
-        path
-      )
-    })
-  })
-
   return {
-    paths: Array.from(pathMap.values()),
+    paths: [],
     fallback: "blocking",
   }
 }
@@ -199,6 +174,13 @@ export const getStaticProps: GetStaticProps = async (context) => {
   )
 
   const [baseRecordMap, ...translationRecordMaps] = recordMaps
+
+  if (!baseRecordMap) {
+    return {
+      notFound: true,
+      revalidate: 60,
+    }
+  }
 
   // Filter out translations that don't have a valid recordMap
   const translationsWithRecordMap = (postDetail.translations ?? [])
