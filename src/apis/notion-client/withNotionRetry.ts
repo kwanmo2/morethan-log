@@ -14,12 +14,16 @@ export const withNotionRetry = async <T>(
       lastError = error
       const message = (error as Error).message
 
-      if (!message.includes("429") || attempt === delays.length) {
+      const isRetryable = ["429", "500", "502", "503", "504"].some((status) =>
+        message.includes(status)
+      )
+
+      if (!isRetryable || attempt === delays.length) {
         break
       }
 
       console.warn(
-        `[@notion] ${label} hit rate limit. Retrying in ${delays[attempt]}ms.`
+        `[@notion] ${label} failed with a retryable error. Retrying in ${delays[attempt]}ms.`
       )
       await wait(delays[attempt])
     }

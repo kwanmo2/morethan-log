@@ -17,6 +17,7 @@ import {
   collectPostContents,
   selectContentByLanguage,
   extractPostLanguage,
+  getPostLanguages,
 } from "src/libs/utils/language"
 import { syncAiTranslations } from "src/libs/server/aiTranslations"
 import {
@@ -82,9 +83,9 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const matchedPost = detailPosts.find((post) => {
     const contents = [post, ...(post.translations ?? [])]
     return contents.some((content) => {
-      const isSameLanguage =
-        buildLanguageSegment(extractPostLanguage(content)) ===
-        normalizedLanguage
+      const isSameLanguage = getPostLanguages(content).some(
+        (language) => buildLanguageSegment(language) === normalizedLanguage
+      )
 
       if (!isSameLanguage) return false
 
@@ -110,8 +111,9 @@ export const getStaticProps: GetStaticProps = async (context) => {
       const contents = [fallbackMatchedPost, ...(fallbackMatchedPost.translations ?? [])]
       const requestedLanguageContent = contents.find(
         (content) =>
-          buildLanguageSegment(extractPostLanguage(content)) ===
-          normalizedLanguage
+          getPostLanguages(content).some(
+            (language) => buildLanguageSegment(language) === normalizedLanguage
+          )
       )
 
       const redirectContent = requestedLanguageContent ?? contents[0]
@@ -136,11 +138,11 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
   const matchedContents = [matchedPost, ...(matchedPost.translations ?? [])]
   const normalizedPathForRequestedLanguage = buildPostPath(
-    matchedContents.find(
-      (content) =>
-        buildLanguageSegment(extractPostLanguage(content)) ===
-        normalizedLanguage
-    ) ?? matchedPost,
+    selectContentByLanguage(
+      matchedContents,
+      normalizedLanguage,
+      DEFAULT_LANGUAGE
+    ),
     normalizedLanguage
   )
 

@@ -48,34 +48,54 @@ export const extractPostLanguage = (post: { language?: string[] }) => {
   return normalizeLanguageCode(first)
 }
 
+export const getPostLanguages = (post: { language?: string[] }) => {
+  return Array.from(
+    new Set(
+      (post.language ?? [])
+        .map((language) => normalizeLanguageCode(language))
+        .filter((language): language is string => Boolean(language))
+    )
+  )
+}
+
+const findContentByLanguage = <T extends { language?: string[] }>(
+  contents: T[],
+  language: string
+) => {
+  const normalizedTarget = normalizeLanguageCode(language)
+  if (!normalizedTarget) return undefined
+
+  return (
+    contents.find((content) => {
+      const languages = getPostLanguages(content)
+      return languages.length === 1 && languages[0] === normalizedTarget
+    }) ||
+    contents.find((content) => getPostLanguages(content).includes(normalizedTarget))
+  )
+}
+
 export const collectPostContents = (post: PostDetail): PostContent[] => {
   const { translations = [], ...baseContent } = post
   return [baseContent as PostContent, ...translations]
 }
 
-export const selectContentByLanguage = (
-  contents: PostContent[],
+export const selectContentByLanguage = <T extends { language?: string[] }>(
+  contents: T[],
   language: string,
   fallbackLanguage: string
 ) => {
   const normalizedTarget = normalizeLanguageCode(language) ?? fallbackLanguage
-  const fallback = contents.find((content) =>
-    (extractPostLanguage(content) ?? fallbackLanguage) === fallbackLanguage
-  )
+  const fallback = findContentByLanguage(contents, fallbackLanguage)
 
   return (
-    contents.find(
-      (content) => extractPostLanguage(content) === normalizedTarget
-    ) || fallback || contents[0]
+    findContentByLanguage(contents, normalizedTarget) || fallback || contents[0]
   )
 }
 
 export const availableLanguagesFromContents = (contents: PostContent[]) => {
   return Array.from(
     new Set(
-      contents
-        .map((content) => extractPostLanguage(content))
-        .filter((language): language is string => Boolean(language))
+      contents.flatMap((content) => getPostLanguages(content))
     )
   )
 }
@@ -100,14 +120,9 @@ export const selectPostBaseByLanguage = (
 
   const normalizedTarget = normalizeLanguageCode(language) ?? fallbackLanguage
 
-  const fallback = options.find(
-    (candidate) =>
-      (extractPostLanguage(candidate) ?? fallbackLanguage) === fallbackLanguage
-  )
+  const fallback = findContentByLanguage(options, fallbackLanguage)
 
   return (
-    options.find(
-      (candidate) => extractPostLanguage(candidate) === normalizedTarget
-    ) || fallback || options[0]
+    findContentByLanguage(options, normalizedTarget) || fallback || options[0]
   )
 }

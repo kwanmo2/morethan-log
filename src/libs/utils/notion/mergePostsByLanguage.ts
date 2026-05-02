@@ -1,5 +1,6 @@
 import {
   extractPostLanguage,
+  getPostLanguages,
   normalizeLanguageCode,
   sanitizePostBase,
 } from "src/libs/utils/language"
@@ -30,6 +31,9 @@ export const mergePostsByLanguage = (
     const normalizedDefault = normalizeLanguageCode(defaultLanguage) ?? defaultLanguage
 
     const primary =
+      group.find((candidate) =>
+        getPostLanguages(candidate).includes(normalizedDefault)
+      ) ||
       group.find(
         (candidate) => extractPostLanguage(candidate) === normalizedDefault
       ) || group[0]
