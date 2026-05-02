@@ -1,4 +1,4 @@
-import { idToUuid } from "notion-utils"
+import { parsePageId } from "notion-utils"
 import { ExtendedRecordMap, ID } from "notion-types"
 
 export default function getAllPageIds(
@@ -24,7 +24,7 @@ export default function getAllPageIds(
 
   let pageIds: ID[] = []
   if (viewId) {
-    const vId = idToUuid(viewId)
+    const vId = parsePageId(viewId, { uuid: true })
     pageIds = views[vId]?.blockIds ?? []
   } else {
     const pageSet = new Set<ID>()

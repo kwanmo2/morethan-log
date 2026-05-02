@@ -69,11 +69,11 @@ async function getPageProperties(
               const resValue =
                 res?.recordMapWithRoles?.notion_user?.[userId[1]]?.value
               const user = {
-                id: resValue?.id,
+                id: resValue?.id || userId[1] || "",
                 name:
                   resValue?.name ||
                   `${resValue?.family_name}${resValue?.given_name}` ||
-                  undefined,
+                  "",
                 profile_photo: resValue?.profile_photo || null,
               }
               users.push(user)

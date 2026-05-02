@@ -11,7 +11,7 @@ import { queryKey } from "src/constants/queryKey"
 import { dehydrate } from "@tanstack/react-query"
 import usePostQuery from "src/hooks/usePostQuery"
 import { FilterPostsOptions } from "src/libs/utils/notion/filterPosts"
-import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "src/constants/language"
+import { DEFAULT_LANGUAGE } from "src/constants/language"
 import useLanguage from "src/hooks/useLanguage"
 import {
   collectPostContents,
@@ -40,34 +40,29 @@ export const getStaticPaths = async () => {
   const postsWithTranslations = await syncAiTranslations(posts)
   const filteredPost = filterPosts(postsWithTranslations, filter)
   const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
+  const pathMap = new Map<string, { params: { lang: string; category: string; slug: string } }>()
 
-  const paths = mergedPosts.flatMap((post) => {
+  mergedPosts.forEach((post) => {
     const contents = [post, ...(post.translations ?? [])]
-    const supportedLangs = new Set(
-      SUPPORTED_LANGUAGES.map((lang) => buildLanguageSegment(lang))
-    )
 
-    contents.forEach((content) =>
-      supportedLangs.add(buildLanguageSegment(extractPostLanguage(content)))
-    )
-
-    return Array.from(supportedLangs).map((lang) => {
-      const matched = contents.find(
-        (content) => buildLanguageSegment(extractPostLanguage(content)) === lang
-      )
-      const base = matched ?? post
-      return {
+    contents.forEach((content) => {
+      const lang = buildLanguageSegment(extractPostLanguage(content))
+      const path = {
         params: {
           lang,
-          category: buildCategorySlug(base.category),
-          slug: buildPostSlug(base.slug),
+          category: buildCategorySlug(content.category),
+          slug: buildPostSlug(content.slug),
         },
       }
+      pathMap.set(
+        `${path.params.lang}/${path.params.category}/${path.params.slug}`,
+        path
+      )
     })
   })
 
   return {
-    paths,
+    paths: Array.from(pathMap.values()),
     fallback: "blocking",
   }
 }

@@ -1,10 +1,17 @@
 import { CONFIG } from "site.config"
-import { idToUuid } from "notion-utils"
+import { parsePageId } from "notion-utils"
 
 import { createNotionApi } from "./createNotionApi"
 import getAllPageIds from "src/libs/utils/notion/getAllPageIds"
 import getPageProperties from "src/libs/utils/notion/getPageProperties"
 import { TPosts } from "src/types"
+import { withNotionRetry } from "./withNotionRetry"
+
+const getRecordValue = (record: any) => {
+  return record?.value?.value || record?.value || record
+}
+
+let postsCache: Promise<TPosts> | null = null
 
 /**
  * @param {{ includePages: boolean }} - false: posts only / true: include pages
@@ -12,6 +19,14 @@ import { TPosts } from "src/types"
 
 // TODO: react query를 사용해서 처음 불러온 뒤로는 해당데이터만 사용하도록 수정
 export const getPosts = async () => {
+  if (!postsCache) {
+    postsCache = fetchPosts()
+  }
+
+  return postsCache
+}
+
+const fetchPosts = async () => {
   let id = CONFIG.notionConfig.pageId as string
   if (!id) {
     console.error(
@@ -23,22 +38,79 @@ export const getPosts = async () => {
 
   let response
   try {
-    response = await api.getPage(id)
+    response = await withNotionRetry(`load database ${id}`, () =>
+      api.getPage(id)
+    )
   } catch (error) {
     console.error(
       `[@notion] Failed to load database ${id}: ${(error as Error).message}`,
       "Check that the Notion page is shared to web or that NOTION_TOKEN is set for notion-client access."
     )
-    return []
+    throw error
   }
 
-  id = idToUuid(id)
-  if (!response.collection || !response.collection_query) {
+  id = parsePageId(id, { uuid: true })
+  if (!response.collection || !response.collection_view) {
     console.error(
       `[@notion] Database ${id} loaded without collection data.`,
       "Verify NOTION_PAGE_ID points to the Share to Web database view page and that the page/database is accessible."
     )
-    return []
+    throw new Error(`Notion database ${id} loaded without collection data.`)
+  }
+
+  const rawMetadata = getRecordValue(response.block?.[id])
+  const collectionId = rawMetadata?.collection_id
+  const viewId = rawMetadata?.view_ids?.[0]
+
+  if (collectionId && viewId && !response.collection_query?.[collectionId]) {
+    const collectionView = getRecordValue(response.collection_view?.[viewId])
+
+    try {
+      const collectionData = await withNotionRetry(
+        `query collection ${collectionId}`,
+        () => api.getCollectionData(collectionId, viewId, collectionView)
+      )
+      const reducerResults = (collectionData.result as any)?.reducerResults
+
+      response.block = {
+        ...response.block,
+        ...collectionData.recordMap.block,
+      }
+      response.collection = {
+        ...response.collection,
+        ...collectionData.recordMap.collection,
+      }
+      response.collection_view = {
+        ...response.collection_view,
+        ...collectionData.recordMap.collection_view,
+      }
+      response.notion_user = {
+        ...response.notion_user,
+        ...collectionData.recordMap.notion_user,
+      }
+      response.collection_query = {
+        ...response.collection_query,
+        [collectionId]: {
+          ...response.collection_query?.[collectionId],
+          [viewId]: reducerResults,
+        },
+      }
+    } catch (error) {
+      console.error(
+        `[@notion] Failed to query collection ${collectionId}: ${
+          (error as Error).message
+        }`
+      )
+      throw error
+    }
+  }
+
+  if (!response.collection_query) {
+    console.error(
+      `[@notion] Database ${id} loaded without collection query data.`,
+      "Verify NOTION_PAGE_ID points to the Share to Web database view page and that the page/database is accessible."
+    )
+    throw new Error(`Notion database ${id} loaded without collection query data.`)
   }
 
   const collectionData = Object.values(response.collection)[0]?.value as any
@@ -51,7 +123,7 @@ export const getPosts = async () => {
       `[@notion] Database ${id} loaded without a collection schema.`,
       "Verify the Notion database view and its properties are accessible."
     )
-    return []
+    throw new Error(`Notion database ${id} loaded without a collection schema.`)
   }
 
   // Handle nested value structure (Notion API response change)
@@ -61,17 +133,17 @@ export const getPosts = async () => {
     return blockData.value.value || blockData.value
   }
 
-  const rawMetadata = getBlockValue(block[id])
+  const databaseMetadata = getBlockValue(block[id])
 
   // Check Type
   if (
-    rawMetadata?.type !== "collection_view_page" &&
-    rawMetadata?.type !== "collection_view"
+    databaseMetadata?.type !== "collection_view_page" &&
+    databaseMetadata?.type !== "collection_view"
   ) {
     console.error(
       "[@notion] The provided pageId is not a database view. Verify the DATABASE ID in CONFIG.notionConfig.pageId."
     )
-    return []
+    throw new Error(`Notion page ${id} is not a database view.`)
   }
 
   // Construct Data
