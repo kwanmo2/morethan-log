@@ -11,7 +11,7 @@ import { queryKey } from "src/constants/queryKey"
 import { dehydrate } from "@tanstack/react-query"
 import usePostQuery from "src/hooks/usePostQuery"
 import { FilterPostsOptions } from "src/libs/utils/notion/filterPosts"
-import { DEFAULT_LANGUAGE } from "src/constants/language"
+import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "src/constants/language"
 import useLanguage from "src/hooks/useLanguage"
 import {
   collectPostContents,
@@ -37,8 +37,50 @@ const filter: FilterPostsOptions = {
 }
 
 export const getStaticPaths = async () => {
+  const posts = await getPosts()
+  const postsWithTranslations = await syncAiTranslations(posts)
+  const filteredPost = filterPosts(postsWithTranslations, filter)
+  const mergedPosts = mergePostsByLanguage(filteredPost, DEFAULT_LANGUAGE)
+  const pathMap = new Map<
+    string,
+    {
+      params: {
+        lang: string
+        category: string
+        slug: string
+      }
+    }
+  >()
+
+  mergedPosts.forEach((post) => {
+    const contents = [post, ...(post.translations ?? [])]
+
+    SUPPORTED_LANGUAGES.forEach((language) => {
+      const lang = buildLanguageSegment(language)
+      const matched =
+        contents.find((content) =>
+          getPostLanguages(content).some(
+            (contentLanguage) => buildLanguageSegment(contentLanguage) === lang
+          )
+        ) ?? post
+      const category = buildCategorySlug(matched.category)
+      const slug = buildPostSlug(matched.slug)
+      const key = `${lang}/${category}/${slug}`
+
+      if (!pathMap.has(key)) {
+        pathMap.set(key, {
+          params: {
+            lang,
+            category,
+            slug,
+          },
+        })
+      }
+    })
+  })
+
   return {
-    paths: [],
+    paths: Array.from(pathMap.values()),
     fallback: "blocking",
   }
 }
@@ -108,12 +150,14 @@ export const getStaticProps: GetStaticProps = async (context) => {
     })
 
     if (fallbackMatchedPost) {
-      const contents = [fallbackMatchedPost, ...(fallbackMatchedPost.translations ?? [])]
-      const requestedLanguageContent = contents.find(
-        (content) =>
-          getPostLanguages(content).some(
-            (language) => buildLanguageSegment(language) === normalizedLanguage
-          )
+      const contents = [
+        fallbackMatchedPost,
+        ...(fallbackMatchedPost.translations ?? []),
+      ]
+      const requestedLanguageContent = contents.find((content) =>
+        getPostLanguages(content).some(
+          (language) => buildLanguageSegment(language) === normalizedLanguage
+        )
       )
 
       const redirectContent = requestedLanguageContent ?? contents[0]
