@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postbuild": "tsx scripts/generate-sitemap.ts",
+    "postbuild": "next-sitemap --config next-sitemap.config.js",
     "lint": "next lint",
     "generate:translations": "tsx scripts/generate-ai-translations.ts"
   },
