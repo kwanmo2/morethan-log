@@ -22,15 +22,21 @@ const Tag: React.FC<Props> = ({ children }) => {
 export default Tag
 
 const StyledWrapper = styled.div`
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
   border-radius: 50px;
   font-size: 0.75rem;
   line-height: 1rem;
-  font-weight: 400;
-  color: ${({ theme }) => theme.colors.gray10};
-  background-color: ${({ theme }) => theme.colors.gray5};
+  font-weight: 500;
+  white-space: nowrap;
+  color: ${({ theme }) => theme.colors.gray12};
+  background-color: ${({ theme }) => theme.colors.gray3};
   cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  :hover {
+    background-color: ${({ theme }) => theme.colors.gray4};
+  }
 `
