@@ -3,7 +3,7 @@ const CONFIG = {
   profile: {
     name: "Slowbeam.dev",
     image: "/avatar.svg", // If you want to create your own notion avatar, check out https://notion-avatar.vercel.app
-    role: "Machine vision tech engineer",
+    role: "EE Engineer",
     bio: "천천히, 그러나 정확하게",
     email: "kwanmo2@gmail.com",
     linkedin: "kwanmo-yeon-aaa0b71a5/",
@@ -42,6 +42,9 @@ const CONFIG = {
     config: {
       measurementId: process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID || "",
     },
+  },
+  visitorStats: {
+    enable: false,
   },
   googleSearchConsole: {
     enable: true,

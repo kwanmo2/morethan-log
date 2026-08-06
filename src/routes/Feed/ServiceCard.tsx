@@ -31,17 +31,19 @@ const recordVisit = async (): Promise<VisitorStats | null> => {
 }
 
 const ServiceCard: React.FC = () => {
+  const isVisitorStatsEnabled = CONFIG.visitorStats.enable === true
   const queryClient = useQueryClient()
   const {
     data: stats,
     isLoading,
     isError,
   } = useQuery(queryKey.visitorStats(), fetchVisitorStats, {
+    enabled: isVisitorStatsEnabled,
     staleTime: 1000 * 60,
   })
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!isVisitorStatsEnabled || typeof window === "undefined") return
 
     const todayKey = getDateKeyForTimeZone(new Date(), VISITOR_TIMEZONE)
     const stored = localStorage.getItem(LAST_VISIT_STORAGE_KEY)
@@ -58,40 +60,44 @@ const ServiceCard: React.FC = () => {
       .catch((error) => {
         console.error("Failed to record visit", error)
       })
-  }, [queryClient])
+  }, [isVisitorStatsEnabled, queryClient])
 
   const projects = CONFIG.projects ?? []
   const hasProjects = projects.length > 0
 
   return (
     <>
-      <StatsWrapper>
-        <div className="title">
-          <Emoji>👥</Emoji> Visitors
-        </div>
-        {isLoading && <div className="description">Loading visitor data…</div>}
-        {isError && (
-          <div className="description error">
-            Unable to load visitor statistics right now.
+      {isVisitorStatsEnabled && (
+        <StatsWrapper>
+          <div className="title">
+            <Emoji>👥</Emoji> Visitors
           </div>
-        )}
-        {!isLoading && !isError && stats && (
-          <div className="grid">
-            <div>
-              <div className="label">Yesterday</div>
-              <div className="value">{stats.yesterday.toLocaleString()}</div>
+          {isLoading && (
+            <div className="description">Loading visitor data…</div>
+          )}
+          {isError && (
+            <div className="description error">
+              Unable to load visitor statistics right now.
             </div>
-            <div>
-              <div className="label">Today</div>
-              <div className="value">{stats.today.toLocaleString()}</div>
+          )}
+          {!isLoading && !isError && stats && (
+            <div className="grid">
+              <div>
+                <div className="label">Yesterday</div>
+                <div className="value">{stats.yesterday.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="label">Today</div>
+                <div className="value">{stats.today.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="label">Total</div>
+                <div className="value">{stats.total.toLocaleString()}</div>
+              </div>
             </div>
-            <div>
-              <div className="label">Total</div>
-              <div className="value">{stats.total.toLocaleString()}</div>
-            </div>
-          </div>
-        )}
-      </StatsWrapper>
+          )}
+        </StatsWrapper>
+      )}
       {hasProjects && (
         <>
           <StyledTitle>
