@@ -38,6 +38,7 @@ Next.js static blog using Notion as a Content Management System (CMS). Supports 
 6. Deploy on Vercel, with the following environment variables.
 
    - `NOTION_PAGE_ID` (Required): The Notion page Id got from the Share to Web URL. This is not the entire URL, but just the NOTION_PAGE_ID part as shown above.
+   - `NOTION_API_BASE_URL` (Optional): The public Notion site's API base URL, such as `https://username.notion.site/api/v3`. Set this when the default `www.notion.so` API returns `403` or `530` for a published database.
    - `NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID` : For Google analytics Plugin.
    - `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` : For Google search console Plugin.
    - `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` : For Naver search advisor Plugin.
