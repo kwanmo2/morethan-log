@@ -3,7 +3,7 @@ const CONFIG = {
   profile: {
     name: "Slowbeam.dev",
     image: "/avatar.svg", // If you want to create your own notion avatar, check out https://notion-avatar.vercel.app
-    role: "EE Engineer",
+    role: "Machine Vision & Embedded Systems Engineer",
     bio: "천천히, 그러나 정확하게",
     email: "kwanmo2@gmail.com",
     linkedin: "kwanmo-yeon-aaa0b71a5/",
@@ -11,17 +11,19 @@ const CONFIG = {
     instagram: "",
   },
   projects: [
-    
     {
       name: `None`,
       href: "",
     },
-    
   ],
   // blog setting (required)
   blog: {
     title: "Slowbeam.dev",
     description: "천천히, 그러나 정확하게",
+    descriptions: {
+      ko: "산업용 카메라, 이미지 센서, 머신비전과 엣지 AI 하드웨어를 실제 설계·문제 해결 경험으로 정리합니다.",
+      en: "Field notes and practical guides on industrial cameras, image sensors, embedded vision, and edge AI hardware.",
+    },
     scheme: "system", // 'light' | 'dark' | 'system'
   },
 
@@ -38,7 +40,7 @@ const CONFIG = {
 
   // plugin configuration (optional)
   googleAnalytics: {
-    enable: false,
+    enable: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID),
     config: {
       measurementId: process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID || "",
     },
@@ -49,13 +51,17 @@ const CONFIG = {
   googleSearchConsole: {
     enable: true,
     config: {
-      siteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "google-site-verification=QYAW84H0VqAb7WXCQrtcC-z1ZNdXPuR4ZxaOUXesSS4",
+      siteVerification:
+        process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
+        "QYAW84H0VqAb7WXCQrtcC-z1ZNdXPuR4ZxaOUXesSS4",
     },
   },
   naverSearchAdvisor: {
     enable: true,
     config: {
-      siteVerification: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION || "cce27213942cb05a47aa55618ecebf602973a604",
+      siteVerification:
+        process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION ||
+        "cce27213942cb05a47aa55618ecebf602973a604",
     },
   },
   utterances: {

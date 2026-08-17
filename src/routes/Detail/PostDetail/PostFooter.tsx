@@ -1,17 +1,21 @@
 import styled from "@emotion/styled"
-import { useRouter } from "next/router"
 import React from "react"
+import Link from "next/link"
+import useLanguage from "src/hooks/useLanguage"
 
 type Props = {}
 
 const Footer: React.FC<Props> = () => {
-  const router = useRouter()
+  const [language] = useLanguage()
   return (
     <StyledWrapper>
-      <a onClick={() => router.push("/")}>← Back</a>
-      <a onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+      <Link href={`/${language}`}>← Back</Link>
+      <button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      >
         ↑ Top
-      </a>
+      </button>
     </StyledWrapper>
   )
 }
@@ -23,9 +27,14 @@ const StyledWrapper = styled.div`
   justify-content: space-between;
   font-weight: 500;
   color: ${({ theme }) => theme.colors.gray10};
-  a {
+  a,
+  button {
     margin-top: 0.5rem;
     cursor: pointer;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
 
     :hover {
       color: ${({ theme }) => theme.colors.gray12};

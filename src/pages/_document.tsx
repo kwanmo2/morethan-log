@@ -3,8 +3,16 @@ import { CONFIG } from "site.config"
 
 class MyDocument extends Document {
   render() {
+    const queryLanguage = this.props.__NEXT_DATA__.query.lang
+    const documentLanguage = queryLanguage === "ko" ? "ko" : "en"
+    const googleVerification =
+      CONFIG.googleSearchConsole.config.siteVerification.replace(
+        /^google-site-verification=/,
+        ""
+      )
+
     return (
-      <Html lang={CONFIG.lang}>
+      <Html lang={documentLanguage}>
         <Head>
           <link rel="icon" href="/favicon.ico" />
           <link
@@ -17,7 +25,7 @@ class MyDocument extends Document {
             <>
               <meta
                 name="google-site-verification"
-                content={CONFIG.googleSearchConsole.config.siteVerification}
+                content={googleVerification}
               />
             </>
           )}

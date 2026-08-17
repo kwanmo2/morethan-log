@@ -11,6 +11,7 @@ import ServiceCard from "./ServiceCard"
 import ContactCard from "./ContactCard"
 import PostList from "./PostList"
 import PinnedPosts from "./PostList/PinnedPosts"
+import SeoIntro from "./SeoIntro"
 
 const HEADER_HEIGHT = 73
 
@@ -30,6 +31,7 @@ const Feed: React.FC<Props> = () => {
         <TagList />
       </div>
       <div className="mid">
+        <SeoIntro />
         <MobileProfileCard />
         <PinnedPosts q={q} />
         <SearchInput value={q} onChange={(e) => setQ(e.target.value)} />

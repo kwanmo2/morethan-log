@@ -1,8 +1,10 @@
-import { useRouter } from "next/router"
 import React from "react"
 import { COLOR_SET } from "./constants"
 import styled from "@emotion/styled"
 import { colors } from "src/styles"
+import Link from "next/link"
+import useLanguage from "src/hooks/useLanguage"
+import { getTopicForCategory } from "src/constants/topics"
 
 export const getColorClassByName = (name: string): string => {
   try {
@@ -23,28 +25,35 @@ type Props = {
 }
 
 const Category: React.FC<Props> = ({ readOnly = false, children }) => {
-  const router = useRouter()
-
-  const handleClick = (value: string) => {
-    if (readOnly) return
-    router.push(`/?category=${value}`)
+  const [language] = useLanguage()
+  const topic = getTopicForCategory(children)
+  const href = topic
+    ? `/${language}/topics/${topic.key}`
+    : `/${language}?category=${encodeURIComponent(children)}`
+  const styles = {
+    backgroundColor: getColorClassByName(children),
+    cursor: readOnly ? "default" : "pointer",
   }
+
+  if (readOnly) {
+    return <StyledLabel css={styles}>{children}</StyledLabel>
+  }
+
   return (
-    <StyledWrapper
-      onClick={() => handleClick(children)}
+    <StyledLink
+      href={href}
       css={{
-        backgroundColor: getColorClassByName(children),
-        cursor: readOnly ? "default" : "pointer",
+        ...styles,
       }}
     >
       {children}
-    </StyledWrapper>
+    </StyledLink>
   )
 }
 
 export default Category
 
-const StyledWrapper = styled.div`
+const categoryStyles = `
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
   padding-left: 0.5rem;
@@ -55,4 +64,12 @@ const StyledWrapper = styled.div`
   line-height: 1.25rem;
   opacity: 0.9;
   color: ${colors.dark.gray1};
+`
+
+const StyledLink = styled(Link)`
+  ${categoryStyles}
+`
+
+const StyledLabel = styled.span`
+  ${categoryStyles}
 `

@@ -10,6 +10,7 @@ const PageDetail: React.FC<Props> = () => {
   if (!data) return null
   return (
     <StyledWrapper>
+      <h1>{data.title}</h1>
       <NotionRenderer recordMap={data.recordMap} />
     </StyledWrapper>
   )
@@ -20,4 +21,11 @@ export default PageDetail
 const StyledWrapper = styled.div`
   margin: 0 auto;
   max-width: 56rem;
+
+  > h1 {
+    margin-bottom: 2rem;
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-weight: 700;
+  }
 `

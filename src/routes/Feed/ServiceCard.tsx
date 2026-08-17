@@ -62,7 +62,7 @@ const ServiceCard: React.FC = () => {
       })
   }, [isVisitorStatsEnabled, queryClient])
 
-  const projects = CONFIG.projects ?? []
+  const projects = (CONFIG.projects ?? []).filter((project) => project.href)
   const hasProjects = projects.length > 0
 
   return (

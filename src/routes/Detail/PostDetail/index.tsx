@@ -8,15 +8,9 @@ import NotionRenderer from "../components/NotionRenderer"
 import usePostQuery from "src/hooks/usePostQuery"
 import usePostsQuery from "src/hooks/usePostsQuery"
 import useLanguage from "src/hooks/useLanguage"
-import { DEFAULT_LANGUAGE } from "src/constants/language"
-import {
-  collectPostContents,
-  selectContentByLanguage,
-} from "src/libs/utils/language"
 import { TPostBase } from "src/types"
 import { buildPostPath } from "src/libs/utils/paths"
 import RelatedPosts from "./RelatedPosts"
-
 
 type Props = {}
 
@@ -25,24 +19,11 @@ const PostDetail: React.FC<Props> = () => {
   const [language] = useLanguage()
   const posts = usePostsQuery()
 
-  const contents = useMemo(
-    () => (data ? collectPostContents(data) : []),
-    [data]
-  )
-
-  const activeContent = useMemo(
-    () =>
-      data && contents.length
-        ? selectContentByLanguage(contents, language, DEFAULT_LANGUAGE)
-        : null,
-    [contents, language, data]
-  )
-
   const relatedPosts = useMemo(() => {
-    if (!data || !activeContent) return []
+    if (!data) return []
 
-    const categorySet = new Set(activeContent.category ?? [])
-    const tagSet = new Set(activeContent.tags ?? [])
+    const categorySet = new Set(data.category ?? [])
+    const tagSet = new Set(data.tags ?? [])
 
     const candidatesByCategory = posts.filter(
       (post) =>
@@ -58,9 +39,10 @@ const PostDetail: React.FC<Props> = () => {
     )
 
     return [...candidatesByCategory, ...candidatesByTag].slice(0, 3)
-  }, [activeContent, data, posts])
+  }, [data, posts])
 
-  if (!data || !activeContent) return null
+  if (!data) return null
+  const activeContent = data
 
   const category =
     (activeContent.category && activeContent.category?.[0]) || undefined
@@ -87,7 +69,9 @@ const PostDetail: React.FC<Props> = () => {
             </Category>
           </div>
         )}
-        {activeContent.type[0] === "Post" && <PostHeader data={activeContent} />}
+        {activeContent.type[0] === "Post" && (
+          <PostHeader data={activeContent} />
+        )}
         <div>
           <NotionRenderer recordMap={activeContent.recordMap} />
         </div>
@@ -95,9 +79,7 @@ const PostDetail: React.FC<Props> = () => {
           <>
             <Footer />
             <CommentBox data={commentTarget} />
-            {relatedPosts.length > 0 && (
-              <RelatedPosts posts={relatedPosts} />
-            )}
+            {relatedPosts.length > 0 && <RelatedPosts posts={relatedPosts} />}
           </>
         )}
       </article>

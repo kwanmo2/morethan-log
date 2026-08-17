@@ -1,27 +1,27 @@
 import styled from "@emotion/styled"
-import { useRouter } from "next/router"
-import React from "react"
+import Link from "next/link"
+import useLanguage from "src/hooks/useLanguage"
 
 type Props = {
   children: string
 }
 
 const Tag: React.FC<Props> = ({ children }) => {
-  const router = useRouter()
+  const [language] = useLanguage()
 
-  const handleClick = (value: string) => {
-    router.push(`/?tag=${value}`)
-  }
   return (
-    <StyledWrapper onClick={() => handleClick(children)}>
+    <StyledLink
+      href={`/${language}?tag=${encodeURIComponent(children)}`}
+      data-nosnippet
+    >
       {children}
-    </StyledWrapper>
+    </StyledLink>
   )
 }
 
 export default Tag
 
-const StyledWrapper = styled.div`
+const StyledLink = styled(Link)`
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;

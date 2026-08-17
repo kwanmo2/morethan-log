@@ -14,9 +14,9 @@ NotFoundPage.getLayout = (page) => {
         {...{
           title: CONFIG.blog.title,
           description: CONFIG.blog.description,
-          type: "Page",
+          pageKind: "website",
           url: CONFIG.link,
-          noindex: true,
+          indexable: false,
         }}
       />
       {page}

@@ -14,6 +14,10 @@ const getRecordValue = (record: any) => {
 
 let postsCache: Promise<TPosts> | null = null
 
+export const clearPostsCache = () => {
+  postsCache = null
+}
+
 /**
  * @param {{ includePages: boolean }} - false: posts only / true: include pages
  */
@@ -115,7 +119,9 @@ const fetchPosts = async () => {
       `[@notion] Database ${id} loaded without collection query data.`,
       "Verify NOTION_PAGE_ID points to the Share to Web database view page and that the page/database is accessible."
     )
-    throw new Error(`Notion database ${id} loaded without collection query data.`)
+    throw new Error(
+      `Notion database ${id} loaded without collection query data.`
+    )
   }
 
   const collectionData = Object.values(response.collection)[0]?.value as any
@@ -161,8 +167,10 @@ const fetchPosts = async () => {
     // Add fullwidth, createdtime to properties
     const blockValue = getBlockValue(block[id])
     properties.createdTime = new Date(blockValue?.created_time).toString()
-    properties.fullWidth =
-      (blockValue?.format as any)?.page_full_width ?? false
+    properties.updatedTime = new Date(
+      blockValue?.last_edited_time ?? blockValue?.created_time
+    ).toISOString()
+    properties.fullWidth = (blockValue?.format as any)?.page_full_width ?? false
 
     data.push(properties)
   }
