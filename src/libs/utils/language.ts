@@ -5,8 +5,8 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   kor: "ko",
   ko: "ko",
   "ko-kr": "ko",
-  "ko_kR": "ko",
-  "ko_kor": "ko",
+  ko_kR: "ko",
+  ko_kor: "ko",
   english: "en",
   eng: "en",
   en: "en",
@@ -70,11 +70,13 @@ const findContentByLanguage = <T extends { language?: string[] }>(
       const languages = getPostLanguages(content)
       return languages.length === 1 && languages[0] === normalizedTarget
     }) ||
-    contents.find((content) => getPostLanguages(content).includes(normalizedTarget))
+    contents.find((content) =>
+      getPostLanguages(content).includes(normalizedTarget)
+    )
   )
 }
 
-export const collectPostContents = (post: PostDetail): PostContent[] => {
+export const collectPostContents = (post: PostDetail): TPostBase[] => {
   const { translations = [], ...baseContent } = post
   return [baseContent as PostContent, ...translations]
 }
@@ -92,17 +94,17 @@ export const selectContentByLanguage = <T extends { language?: string[] }>(
   )
 }
 
-export const availableLanguagesFromContents = (contents: PostContent[]) => {
+export const availableLanguagesFromContents = (contents: TPostBase[]) => {
   return Array.from(
-    new Set(
-      contents.flatMap((content) => getPostLanguages(content))
-    )
+    new Set(contents.flatMap((content) => getPostLanguages(content)))
   )
 }
 
 type PostWithOptionalTranslations = TPostBase & { translations?: TPostBase[] }
 
-export const sanitizePostBase = (post: PostWithOptionalTranslations): TPostBase => {
+export const sanitizePostBase = (
+  post: PostWithOptionalTranslations
+): TPostBase => {
   const { translations: _translations, ...rest } = post
   return rest
 }

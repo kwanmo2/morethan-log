@@ -5,39 +5,36 @@ import { MdExpandMore } from "react-icons/md"
 import { DEFAULT_CATEGORY } from "src/constants"
 import styled from "@emotion/styled"
 import { useCategoriesQuery } from "src/hooks/useCategoriesQuery"
+import Link from "next/link"
+import useLanguage from "src/hooks/useLanguage"
 
 type Props = {}
 
 const CategorySelect: React.FC<Props> = () => {
   const router = useRouter()
+  const [language] = useLanguage()
   const data = useCategoriesQuery()
   const [dropdownRef, opened, handleOpen] = useDropdown()
 
   const currentCategory = `${router.query.category || ``}` || DEFAULT_CATEGORY
 
-  const handleOptionClick = (category: string) => {
-    router.push({
-      query: {
-        ...router.query,
-        category,
-      },
-    })
-  }
   return (
-    <StyledWrapper>
-      <div ref={dropdownRef} className="wrapper" onClick={handleOpen}>
-        {currentCategory} Posts <MdExpandMore />
+    <StyledWrapper data-nosnippet>
+      <div ref={dropdownRef} className="wrapper">
+        <button type="button" aria-expanded={opened} onClick={handleOpen}>
+          {currentCategory} Posts <MdExpandMore />
+        </button>
       </div>
       {opened && (
         <div className="content">
           {Object.keys(data).map((key, idx) => (
-            <div
+            <Link
               className="item"
               key={idx}
-              onClick={() => handleOptionClick(key)}
+              href={`/${language}?category=${encodeURIComponent(key)}`}
             >
               {`${key} (${data[key]})`}
-            </div>
+            </Link>
           ))}
         </div>
       )}
@@ -59,6 +56,16 @@ const StyledWrapper = styled.div`
     line-height: 1.75rem;
     font-weight: 700;
     cursor: pointer;
+    button {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
   }
   > .content {
     position: absolute;

@@ -10,8 +10,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postbuild": "next-sitemap --config next-sitemap.config.js",
+    "postbuild": "next-sitemap --config next-sitemap.config.js && node scripts/seo-check.mjs",
     "lint": "next lint",
+    "seo:check": "node scripts/seo-check.mjs",
+    "verify": "next lint && next build && node scripts/seo-check.mjs",
     "generate:translations": "tsx scripts/generate-ai-translations.ts"
   },
   "dependencies": {

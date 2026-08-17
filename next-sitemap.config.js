@@ -16,13 +16,12 @@ module.exports = {
   generateRobotsTxt: true,
   sitemapSize: 7000,
   generateIndexSitemap: false,
-  autoLastmod: true,
+  autoLastmod: false,
   transform: async (_config, path) => {
     if (!isSupportedRoute(path)) return null
 
     return {
       loc: path,
-      lastmod: new Date().toISOString(),
     }
   },
 }

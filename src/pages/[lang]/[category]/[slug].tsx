@@ -12,12 +12,12 @@ import { dehydrate } from "@tanstack/react-query"
 import usePostQuery from "src/hooks/usePostQuery"
 import { FilterPostsOptions } from "src/libs/utils/notion/filterPosts"
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "src/constants/language"
-import useLanguage from "src/hooks/useLanguage"
 import {
   collectPostContents,
-  selectContentByLanguage,
   extractPostLanguage,
   getPostLanguages,
+  sanitizePostBase,
+  selectContentByLanguage,
 } from "src/libs/utils/language"
 import { syncAiTranslations } from "src/libs/server/aiTranslations"
 import {
@@ -28,8 +28,6 @@ import {
   buildPostCacheKey,
   getCanonicalUrl,
 } from "src/libs/utils/paths"
-import { useEffect, useMemo } from "react"
-import { useRouter } from "next/router"
 
 const filter: FilterPostsOptions = {
   acceptStatus: ["Public", "PublicOnDetail"],
@@ -55,27 +53,36 @@ export const getStaticPaths = async () => {
   mergedPosts.forEach((post) => {
     const contents = [post, ...(post.translations ?? [])]
 
-    SUPPORTED_LANGUAGES.forEach((language) => {
-      const lang = buildLanguageSegment(language)
-      const matched =
-        contents.find((content) =>
-          getPostLanguages(content).some(
-            (contentLanguage) => buildLanguageSegment(contentLanguage) === lang
-          )
-        ) ?? post
-      const category = buildCategorySlug(matched.category)
-      const slug = buildPostSlug(matched.slug)
-      const key = `${lang}/${category}/${slug}`
+    contents.forEach((content) => {
+      const contentLanguages = getPostLanguages(content)
+      const languages = contentLanguages.length
+        ? contentLanguages
+        : [DEFAULT_LANGUAGE]
 
-      if (!pathMap.has(key)) {
-        pathMap.set(key, {
-          params: {
-            lang,
-            category,
-            slug,
-          },
-        })
-      }
+      languages.forEach((language) => {
+        const lang = buildLanguageSegment(language)
+        if (
+          !SUPPORTED_LANGUAGES.includes(
+            lang as (typeof SUPPORTED_LANGUAGES)[number]
+          )
+        ) {
+          return
+        }
+
+        const category = buildCategorySlug(content.category)
+        const slug = buildPostSlug(content.slug)
+        const key = `${lang}/${category}/${slug}`
+
+        if (!pathMap.has(key)) {
+          pathMap.set(key, {
+            params: {
+              lang,
+              category,
+              slug,
+            },
+          })
+        }
+      })
     })
   })
 
@@ -108,6 +115,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
   const normalizedSlug = buildPostSlug(slugParam)
   const normalizedCategory = buildCategorySlug([categoryParam])
   const normalizedLanguage = buildLanguageSegment(langParam)
+  queryClient.setQueryData(queryKey.language(), normalizedLanguage)
 
   const posts = await getPosts()
   const postsWithTranslations = await syncAiTranslations(posts)
@@ -181,12 +189,13 @@ export const getStaticProps: GetStaticProps = async (context) => {
   }
 
   const matchedContents = [matchedPost, ...(matchedPost.translations ?? [])]
+  const activeContent = selectContentByLanguage(
+    matchedContents,
+    normalizedLanguage,
+    DEFAULT_LANGUAGE
+  )
   const normalizedPathForRequestedLanguage = buildPostPath(
-    selectContentByLanguage(
-      matchedContents,
-      normalizedLanguage,
-      DEFAULT_LANGUAGE
-    ),
+    activeContent,
     normalizedLanguage
   )
 
@@ -200,53 +209,37 @@ export const getStaticProps: GetStaticProps = async (context) => {
     }
   }
 
-  const postDetail = matchedPost
-  const contents = matchedContents
+  let activeRecordMap
+  try {
+    activeRecordMap = await getRecordMap(activeContent.id)
+  } catch (error) {
+    console.warn(
+      `[getStaticProps] Failed to get recordMap for ${activeContent.id}: ${
+        (error as Error).message
+      }`
+    )
+  }
 
-  // Fetch recordMaps for all content versions (including AI translations stored in Notion)
-  const recordMaps = await Promise.all(
-    contents.map(async (content) => {
-      try {
-        return await getRecordMap(content.id)
-      } catch (error) {
-        console.warn(
-          `[getStaticProps] Failed to get recordMap for ${content.id}: ${
-            (error as Error).message
-          }`
-        )
-        return null
-      }
-    })
-  )
-
-  const [baseRecordMap, ...translationRecordMaps] = recordMaps
-
-  if (!baseRecordMap) {
+  if (!activeRecordMap) {
     return {
       notFound: true,
       revalidate: 60,
     }
   }
 
-  // Filter out translations that don't have a valid recordMap
-  const translationsWithRecordMap = (postDetail.translations ?? [])
-    .map((translation, index) => {
-      const recordMap = translationRecordMaps[index]
-      if (!recordMap) return null
-      return {
-        ...translation,
-        slug: buildPostSlug(translation.slug),
-        recordMap,
-      }
-    })
-    .filter((t): t is NonNullable<typeof t> => t !== null)
+  const alternateContents = matchedContents
+    .filter((content) => content.id !== activeContent.id)
+    .map((content) => ({
+      ...sanitizePostBase(content),
+      slug: buildPostSlug(content.slug),
+    }))
 
   const hydratedPost = {
-    ...postDetail,
-    slug: buildPostSlug(postDetail.slug),
-    recordMap: baseRecordMap,
-    translations:
-      translationsWithRecordMap.length > 0 ? translationsWithRecordMap : [],
+    ...sanitizePostBase(activeContent),
+    id: matchedPost.id,
+    slug: buildPostSlug(activeContent.slug),
+    recordMap: activeRecordMap,
+    translations: alternateContents,
   }
 
   const postCacheKey = buildPostCacheKey({
@@ -263,62 +256,47 @@ export const getStaticProps: GetStaticProps = async (context) => {
   return {
     props: {
       dehydratedState: dehydrate(queryClient),
+      language: normalizedLanguage,
     },
     revalidate: CONFIG.revalidateTime,
   }
 }
 
-const DetailPage: NextPageWithLayout = () => {
-  const post = usePostQuery()
-  const [language, setLanguage] = useLanguage()
-  const router = useRouter()
-  const pathLanguage = useMemo(() => {
-    const langParam = router.query.lang
-    if (typeof langParam !== "string") return undefined
-    return buildLanguageSegment(langParam)
-  }, [router.query.lang])
+type DetailPageProps = {
+  language: string
+}
 
-  useEffect(() => {
-    if (pathLanguage) {
-      setLanguage(pathLanguage)
-    }
-  }, [pathLanguage, setLanguage])
+const DetailPage: NextPageWithLayout<DetailPageProps> = ({ language }) => {
+  const post = usePostQuery()
 
   if (!post) return <CustomError />
 
   const contents = collectPostContents(post)
-  const activeContent = selectContentByLanguage(
-    contents,
-    pathLanguage ?? language,
-    DEFAULT_LANGUAGE
-  )
-
-  const image =
-    activeContent.thumbnail ??
-    post.thumbnail ??
-    CONFIG.ogImageGenerateURL ??
-    `${CONFIG.ogImageGenerateURL}/${encodeURIComponent(
-      activeContent.title
-    )}.png`
+  const activeContent = post
+  const image = activeContent.thumbnail ?? "/apple-touch-icon.png"
 
   const date =
     activeContent.date?.start_date ||
     activeContent.createdTime ||
     post.createdTime
 
-  const canonicalLanguage = buildLanguageSegment(
-    extractPostLanguage(activeContent) ?? pathLanguage ?? language
-  )
+  const canonicalLanguage = buildLanguageSegment(language)
   const canonicalPath = buildPostPath(activeContent, canonicalLanguage)
-  const alternateUrlMap = contents.reduce((acc, content) => {
-    const lang = buildLanguageSegment(
-      extractPostLanguage(content) ?? canonicalLanguage
-    )
-    if (!acc.has(lang)) {
-      acc.set(lang, getCanonicalUrl(buildPostPath(content, lang), CONFIG.link))
-    }
-    return acc
-  }, new Map<string, string>())
+  const alternateUrlMap = new Map<string, string>([
+    [canonicalLanguage, getCanonicalUrl(canonicalPath, CONFIG.link)],
+  ])
+
+  contents.slice(1).forEach((content) => {
+    getPostLanguages(content).forEach((contentLanguage) => {
+      const language = buildLanguageSegment(contentLanguage)
+      if (!alternateUrlMap.has(language)) {
+        alternateUrlMap.set(
+          language,
+          getCanonicalUrl(buildPostPath(content, language), CONFIG.link)
+        )
+      }
+    })
+  })
 
   const alternates = Array.from(alternateUrlMap.entries()).map(
     ([hrefLang, href]) => ({
@@ -333,20 +311,40 @@ const DetailPage: NextPageWithLayout = () => {
     getCanonicalUrl(canonicalPath, CONFIG.link)
 
   const meta = {
-    title: activeContent.title,
-    date: new Date(date).toISOString(),
+    title: `${activeContent.title} | ${CONFIG.blog.title}`,
+    datePublished: new Date(date).toISOString(),
+    dateModified: activeContent.updatedTime || new Date(date).toISOString(),
     image,
-    description: activeContent.summary || post.summary || "",
-    type: activeContent.type[0],
+    description:
+      activeContent.summary ||
+      (canonicalLanguage === "ko"
+        ? CONFIG.blog.descriptions.ko
+        : CONFIG.blog.descriptions.en),
+    pageKind:
+      activeContent.type[0] === "Page"
+        ? ("profile" as const)
+        : ("article" as const),
     url: getCanonicalUrl(canonicalPath, CONFIG.link),
     canonical: canonicalPath,
     keywords: activeContent.tags ?? post.tags ?? [],
     language: canonicalLanguage,
+    authorName: activeContent.author?.[0]?.name || CONFIG.profile.name,
+    indexable: !activeContent.translationReviewStatus?.includes("NeedsFix"),
     alternates: [
       ...alternates,
       {
         hrefLang: "x-default",
         href: defaultAlternateHref,
+      },
+    ],
+    breadcrumbs: [
+      {
+        name: CONFIG.blog.title,
+        url: getCanonicalUrl(`/${canonicalLanguage}`, CONFIG.link),
+      },
+      {
+        name: activeContent.title,
+        url: getCanonicalUrl(canonicalPath, CONFIG.link),
       },
     ],
   }

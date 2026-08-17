@@ -1,38 +1,35 @@
 import styled from "@emotion/styled"
+import Link from "next/link"
 import { useRouter } from "next/router"
-import React from "react"
+import useLanguage from "src/hooks/useLanguage"
 
 type TOrder = "asc" | "desc"
 
-type Props = {}
-
-const OrderButtons: React.FC<Props> = () => {
+const OrderButtons = () => {
   const router = useRouter()
+  const [language] = useLanguage()
+  const currentOrder = router.query.order === "asc" ? "asc" : "desc"
 
-  const currentOrder = `${router.query.order || ``}` || ("desc" as TOrder)
-
-  const handleClickOrderBy = (value: TOrder) => {
-    router.push({
-      query: {
-        ...router.query,
-        order: value,
-      },
-    })
+  const getHref = (order: TOrder) => {
+    const query = new URLSearchParams()
+    if (typeof router.query.tag === "string") {
+      query.set("tag", router.query.tag)
+    }
+    if (typeof router.query.category === "string") {
+      query.set("category", router.query.category)
+    }
+    query.set("order", order)
+    return `/${language}?${query.toString()}`
   }
+
   return (
-    <StyledWrapper>
-      <a
-        data-active={currentOrder === "desc"}
-        onClick={() => handleClickOrderBy("desc")}
-      >
+    <StyledWrapper data-nosnippet>
+      <Link href={getHref("desc")} data-active={currentOrder === "desc"}>
         Desc
-      </a>
-      <a
-        data-active={currentOrder === "asc"}
-        onClick={() => handleClickOrderBy("asc")}
-      >
+      </Link>
+      <Link href={getHref("asc")} data-active={currentOrder === "asc"}>
         Asc
-      </a>
+      </Link>
     </StyledWrapper>
   )
 }
@@ -44,13 +41,13 @@ const StyledWrapper = styled.div`
   gap: 0.5rem;
   font-size: 0.875rem;
   line-height: 1.25rem;
+
   a {
     cursor: pointer;
     color: ${({ theme }) => theme.colors.gray10};
 
     &[data-active="true"] {
       font-weight: 700;
-
       color: ${({ theme }) => theme.colors.gray12};
     }
   }

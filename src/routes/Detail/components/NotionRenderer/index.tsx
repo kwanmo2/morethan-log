@@ -2,6 +2,7 @@ import dynamic from "next/dynamic"
 import Image from "next/image"
 import Link from "next/link"
 import { ExtendedRecordMap } from "notion-types"
+import { NotionRenderer as ReactNotionRenderer } from "react-notion-x"
 import useScheme from "src/hooks/useScheme"
 
 // core styles shared by all of react-notion-x (required)
@@ -16,13 +17,10 @@ import "katex/dist/katex.min.css"
 import { FC } from "react"
 import styled from "@emotion/styled"
 
-const _NotionRenderer = dynamic(
-  () => import("react-notion-x").then((m) => m.NotionRenderer),
-  { ssr: false }
-)
-
 const Code = dynamic(() =>
-  import("react-notion-x/build/third-party/code").then(async (m) => m.Code)
+  import("react-notion-x/build/third-party/code").then(
+    (codeModule) => codeModule.Code
+  )
 )
 
 const Collection = dynamic(() =>
@@ -61,7 +59,7 @@ const NotionRenderer: FC<Props> = ({ recordMap }) => {
 
   return (
     <StyledWrapper>
-      <_NotionRenderer
+      <ReactNotionRenderer
         darkMode={scheme === "dark"}
         recordMap={recordMap}
         components={{

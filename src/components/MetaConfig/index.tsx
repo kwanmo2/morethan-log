@@ -1,38 +1,138 @@
-import { CONFIG } from "site.config"
 import Head from "next/head"
+import { CONFIG } from "site.config"
 import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from "src/constants/language"
-import { getCanonicalUrl } from "src/libs/utils/paths"
+import { getAbsoluteUrl, getCanonicalUrl } from "src/libs/utils/paths"
 
 export type MetaConfigProps = {
   title: string
   description: string
-  type: "Website" | "Post" | "Page" | string
-  date?: string
-  image?: string
+  pageKind: "website" | "article" | "profile"
   url: string
   canonical?: string
+  image?: string
   keywords?: string[]
   language?: string
-  noindex?: boolean
+  indexable?: boolean
+  datePublished?: string
+  dateModified?: string
+  authorName?: string
   alternates?: {
     hrefLang: string
     href: string
   }[]
+  breadcrumbs?: {
+    name: string
+    url?: string
+  }[]
 }
 
-const MetaConfig: React.FC<MetaConfigProps> = (props) => {
-  const canonicalUrl = getCanonicalUrl(props.canonical ?? props.url, CONFIG.link)
-  const ogLocale = props.language ?? CONFIG.lang ?? DEFAULT_LANGUAGE
-  const alternateLocales = SUPPORTED_LANGUAGES.filter((lang) => lang !== ogLocale)
+const OG_LOCALES: Record<string, string> = {
+  ko: "ko_KR",
+  en: "en_US",
+}
+
+const serializeJsonLd = (value: unknown) =>
+  JSON.stringify(value).replace(/</g, "\\u003c")
+
+const MetaConfig: React.FC<MetaConfigProps> = ({
+  indexable = true,
+  ...props
+}) => {
+  const canonicalUrl = getCanonicalUrl(
+    props.canonical ?? props.url,
+    CONFIG.link
+  )
+  const language = props.language ?? DEFAULT_LANGUAGE
+  const ogLocale = OG_LOCALES[language] ?? language
+  const alternateLocales = SUPPORTED_LANGUAGES.filter(
+    (supportedLanguage) => supportedLanguage !== language
+  )
+  const image = props.image
+    ? getAbsoluteUrl(props.image, CONFIG.link)
+    : getAbsoluteUrl(CONFIG.profile.image, CONFIG.link)
+  const authorName = props.authorName || CONFIG.profile.name
+  const authorUrl = getCanonicalUrl(`/${language}/about/about`, CONFIG.link)
+
+  const entity =
+    props.pageKind === "article"
+      ? {
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          headline: props.title,
+          description: props.description,
+          url: canonicalUrl,
+          mainEntityOfPage: canonicalUrl,
+          inLanguage: language,
+          datePublished: props.datePublished,
+          dateModified: props.dateModified ?? props.datePublished,
+          image: [image],
+          keywords: props.keywords?.join(", "),
+          author: {
+            "@type": "Person",
+            name: authorName,
+            url: authorUrl,
+          },
+          publisher: {
+            "@type": "Organization",
+            name: CONFIG.blog.title,
+            logo: {
+              "@type": "ImageObject",
+              url: getAbsoluteUrl(CONFIG.profile.image, CONFIG.link),
+            },
+          },
+        }
+      : props.pageKind === "profile"
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ProfilePage",
+          name: props.title,
+          description: props.description,
+          url: canonicalUrl,
+          inLanguage: language,
+          mainEntity: {
+            "@type": "Person",
+            name: authorName,
+            url: canonicalUrl,
+          },
+        }
+      : {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: CONFIG.blog.title,
+          headline: props.title,
+          description: props.description,
+          url: canonicalUrl,
+          inLanguage: language,
+          author: {
+            "@type": "Person",
+            name: authorName,
+            url: authorUrl,
+          },
+        }
+
+  const breadcrumbEntity = props.breadcrumbs?.length
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: props.breadcrumbs.map((breadcrumb, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: breadcrumb.name,
+          item: breadcrumb.url,
+        })),
+      }
+    : null
 
   return (
     <Head>
       <title>{props.title}</title>
-      <meta name="robots" content={props.noindex ? "noindex, follow" : "index, follow"} />
+      <meta
+        name="robots"
+        content={indexable ? "index, follow" : "noindex, follow"}
+      />
       <meta charSet="UTF-8" />
       <meta name="description" content={props.description} />
-      <meta name="keywords" content={props.keywords?.join(", ") ?? CONFIG.blog.title} />
-      <meta name="author" content={CONFIG.profile.name} />
+      <meta name="author" content={authorName} />
       <meta name="application-name" content={CONFIG.blog.title} />
       <link rel="canonical" href={canonicalUrl} />
       {props.alternates?.map((alternate) => (
@@ -43,52 +143,52 @@ const MetaConfig: React.FC<MetaConfigProps> = (props) => {
           href={alternate.href}
         />
       ))}
-      {/* og */}
-      <meta property="og:type" content={props.type} />
+      <meta
+        property="og:type"
+        content={props.pageKind === "article" ? "article" : "website"}
+      />
       <meta property="og:title" content={props.title} />
       <meta property="og:description" content={props.description} />
       <meta property="og:url" content={canonicalUrl} />
       <meta property="og:site_name" content={CONFIG.blog.title} />
       <meta property="og:locale" content={ogLocale} />
       {alternateLocales.map((locale) => (
-        <meta key={locale} property="og:locale:alternate" content={locale} />
+        <meta
+          key={locale}
+          property="og:locale:alternate"
+          content={OG_LOCALES[locale] ?? locale}
+        />
       ))}
-      {props.image && <meta property="og:image" content={props.image} />}
-      {/* twitter */}
+      <meta property="og:image" content={image} />
       <meta name="twitter:title" content={props.title} />
       <meta name="twitter:description" content={props.description} />
       <meta name="twitter:card" content="summary_large_image" />
-      {props.image && <meta name="twitter:image" content={props.image} />}
-      {/* post */}
-      {props.type === "Post" && (
+      <meta name="twitter:image" content={image} />
+      {props.pageKind === "article" ? (
         <>
-          <meta property="article:published_time" content={props.date} />
-          <meta property="article:author" content={CONFIG.profile.name} />
+          <meta
+            property="article:published_time"
+            content={props.datePublished}
+          />
+          <meta
+            property="article:modified_time"
+            content={props.dateModified ?? props.datePublished}
+          />
+          <meta property="article:author" content={authorName} />
         </>
-      )}
+      ) : null}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': props.type === "Post" ? 'BlogPosting' : 'WebSite',
-            headline: props.title,
-            description: props.description,
-            url: canonicalUrl,
-            inLanguage: ogLocale,
-            datePublished: props.date,
-            author: {
-              '@type': 'Person',
-              name: CONFIG.profile.name,
-            },
-            image: props.image,
-            publisher: {
-              '@type': 'Organization',
-              name: CONFIG.blog.title,
-            },
-          }),
-        }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(entity) }}
       />
+      {breadcrumbEntity ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: serializeJsonLd(breadcrumbEntity),
+          }}
+        />
+      ) : null}
     </Head>
   )
 }

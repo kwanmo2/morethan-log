@@ -27,13 +27,21 @@ export const buildPostSlug = (slug: string) => normalizeSegment(slug, slug)
 
 export const buildLanguageSegment = (language?: string) => {
   const normalized = normalizeLanguageCode(language)
-  if (normalized && SUPPORTED_LANGUAGES.includes(normalized as (typeof SUPPORTED_LANGUAGES)[number])) {
+  if (
+    normalized &&
+    SUPPORTED_LANGUAGES.includes(
+      normalized as (typeof SUPPORTED_LANGUAGES)[number]
+    )
+  ) {
     return normalized
   }
   return DEFAULT_LANGUAGE
 }
 
-export const buildPostPath = (post: Pick<TPostBase, "slug" | "category">, language?: string) => {
+export const buildPostPath = (
+  post: Pick<TPostBase, "slug" | "category">,
+  language?: string
+) => {
   const languageSegment = buildLanguageSegment(language)
   const categorySegment = buildCategorySlug(post.category)
   const slugSegment = buildPostSlug(post.slug)
@@ -47,13 +55,25 @@ export const buildPostCacheKey = (options: {
   language?: string
 }) => {
   const languageSegment = buildLanguageSegment(options.language)
-  const categorySegment = normalizeSegment(options.category, DEFAULT_CATEGORY_SLUG)
+  const categorySegment = normalizeSegment(
+    options.category,
+    DEFAULT_CATEGORY_SLUG
+  )
   const slugSegment = buildPostSlug(options.slug)
   return `${languageSegment}/${categorySegment}/${slugSegment}`
 }
 
 export const getCanonicalUrl = (path: string, siteUrl: string) => {
+  if (/^https?:\/\//i.test(path)) return path
   const trimmedBase = siteUrl.replace(/\/+$/, "")
   const normalizedPath = path.startsWith("/") ? path : `/${path}`
   return `${trimmedBase}${normalizedPath}`
+}
+
+export const getAbsoluteUrl = (value: string, siteUrl: string) => {
+  try {
+    return new URL(value, siteUrl).toString()
+  } catch {
+    return value
+  }
 }

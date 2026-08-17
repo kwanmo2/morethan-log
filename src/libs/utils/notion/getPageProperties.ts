@@ -6,6 +6,7 @@ import {
   ensureLanguageArray,
   normalizeLanguageCode,
 } from "src/libs/utils/language"
+import { CONFIG } from "site.config"
 
 async function getPageProperties(
   id: string,
@@ -68,12 +69,12 @@ async function getPageProperties(
               const res: any = await api.getUsers(userId)
               const resValue =
                 res?.recordMapWithRoles?.notion_user?.[userId[1]]?.value
+              const composedName = [resValue?.given_name, resValue?.family_name]
+                .filter(Boolean)
+                .join(" ")
               const user = {
                 id: resValue?.id || userId[1] || "",
-                name:
-                  resValue?.name ||
-                  `${resValue?.family_name}${resValue?.given_name}` ||
-                  "",
+                name: resValue?.name || composedName || CONFIG.profile.name,
                 profile_photo: resValue?.profile_photo || null,
               }
               users.push(user)
@@ -108,6 +109,10 @@ async function getPageProperties(
   delete (properties as any).Language
   delete (properties as any).lang
   delete (properties as any).Lang
+
+  if (typeof properties.title === "string") {
+    properties.title = properties.title.replace(/\s+/g, " ").trim()
+  }
 
   return properties
 }

@@ -1,5 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import mermaid from "mermaid"
+import { useQuery } from "@tanstack/react-query"
 import { useEffect, useRef } from "react"
 import { queryKey } from "src/constants/queryKey"
 import useScheme from "src/hooks/useScheme"
@@ -8,24 +7,6 @@ import useScheme from "src/hooks/useScheme"
  *  Wait for mermaid to be defined in the dom
  *  Additionally, verify that the HTML CollectionOf has an array value.
  */
-const waitForMermaid = (interval = 100, timeout = 5000) => {
-  return new Promise<HTMLCollectionOf<Element>>((resolve, reject) => {
-    const startTime = Date.now()
-    const elements: HTMLCollectionOf<Element> =
-      document.getElementsByClassName("language-mermaid")
-
-    const checkMerMaidCode = () => {
-      if (mermaid.render !== undefined && elements.length > 0) {
-        resolve(elements)
-      } else if (Date.now() - startTime >= timeout) {
-        reject(new Error(`mermaid is not defined within the timeout period.`))
-      } else {
-        setTimeout(checkMerMaidCode, interval)
-      }
-    }
-    checkMerMaidCode()
-  })
-}
 const useMermaidEffect = () => {
   const memoMermaidRef = useRef<Map<number, string>>(new Map())
 
@@ -36,15 +17,15 @@ const useMermaidEffect = () => {
 
   useEffect(() => {
     if (!isFetched) return
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: (data as "dark" | "light") === "dark" ? "dark" : "default",
-    })
+    const elements = document.getElementsByClassName("language-mermaid")
+    if (elements.length === 0) return
 
-    if (!document) return
-
-    waitForMermaid()
-      .then(async (elements) => {
+    import("mermaid")
+      .then(async ({ default: mermaid }) => {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: (data as "dark" | "light") === "dark" ? "dark" : "default",
+        })
         const promises = Array.from(elements)
           .filter((elements) => elements.tagName === "PRE")
           .map(async (element, i) => {

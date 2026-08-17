@@ -3,49 +3,35 @@ import { useRouter } from "next/router"
 import React from "react"
 import { Emoji } from "src/components/Emoji"
 import { useTagsQuery } from "src/hooks/useTagsQuery"
+import Link from "next/link"
+import useLanguage from "src/hooks/useLanguage"
 
 type Props = {}
 
 const TagList: React.FC<Props> = () => {
   const router = useRouter()
+  const [language] = useLanguage()
   const currentTag = router.query.tag || undefined
   const data = useTagsQuery()
 
-  const handleClickTag = (value: any) => {
-    // delete
-    if (currentTag === value) {
-      router.push({
-        query: {
-          ...router.query,
-          tag: undefined,
-        },
-      })
-    }
-    // add
-    else {
-      router.push({
-        query: {
-          ...router.query,
-          tag: value,
-        },
-      })
-    }
-  }
-
   return (
-    <StyledWrapper>
+    <StyledWrapper data-nosnippet>
       <div className="top">
         <Emoji>🏷️</Emoji> Tags
       </div>
       <div className="list">
         {Object.keys(data).map((key) => (
-          <a
+          <Link
             key={key}
             data-active={key === currentTag}
-            onClick={() => handleClickTag(key)}
+            href={
+              key === currentTag
+                ? `/${language}`
+                : `/${language}?tag=${encodeURIComponent(key)}`
+            }
           >
             {key}
-          </a>
+          </Link>
         ))}
       </div>
     </StyledWrapper>

@@ -42,6 +42,9 @@ Next.js static blog using Notion as a Content Management System (CMS). Supports 
    - `NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID` : For Google analytics Plugin.
    - `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` : For Google search console Plugin.
    - `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` : For Naver search advisor Plugin.
+   - `TOKEN_FOR_REVALIDATE` : Bearer token for the on-demand revalidation endpoint.
+   - `INDEXNOW_KEY` *(optional)* : Override the bundled public IndexNow key. If overridden, publish the matching key file and set `INDEXNOW_KEY_LOCATION`.
+   - `INDEXNOW_KEY_LOCATION` *(optional)* : Absolute URL of a custom IndexNow key file.
    - `NEXT_PUBLIC_UTTERANCES_REPO` : For Utterances Plugin.
    - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` : Required for Google comment authentication.
    - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` : Required to persist visitor statistics and comments using Upstash Redis REST API.

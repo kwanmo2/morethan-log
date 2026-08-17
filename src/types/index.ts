@@ -14,6 +14,7 @@ export type AppPropsWithLayout = AppProps & {
 
 export type TPostStatus = "Private" | "Public" | "PublicOnDetail"
 export type TPostType = "Post" | "Paper" | "Page"
+export type TTranslationReviewStatus = "Auto" | "Reviewed" | "NeedsFix"
 
 export type TPostBase = {
   id: string
@@ -31,10 +32,12 @@ export type TPostBase = {
   title: string
   status: TPostStatus[]
   createdTime: string
+  updatedTime: string
   fullWidth: boolean
   thumbnail?: string
   language?: string[]
   isAiTranslation?: boolean
+  translationReviewStatus?: TTranslationReviewStatus[]
 }
 
 export type TPost = TPostBase & {
@@ -46,7 +49,7 @@ export type PostContent = TPostBase & {
 }
 
 export type PostDetail = PostContent & {
-  translations?: PostContent[]
+  translations?: TPostBase[]
 }
 
 export type TPosts = TPost[]
