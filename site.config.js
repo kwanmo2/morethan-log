@@ -21,7 +21,7 @@ const CONFIG = {
     title: "Slowbeam.dev",
     description: "천천히, 그러나 정확하게",
     descriptions: {
-      ko: "전자공학, 하드웨어, 임베디드 시스템, 머신비전과 소프트웨어를 실제 설계·문제 해결 경험으로 정리합니다.",
+      ko: "전자공학, 하드웨어, 임베디드 시스템, 머신비전과 소프트웨어에 대한 내용과 의견을 정리합니다.",
       en: "Practical engineering notes on electronics, hardware, embedded systems, machine vision, and software.",
     },
     scheme: "system", // 'light' | 'dark' | 'system'
