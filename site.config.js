@@ -21,8 +21,8 @@ const CONFIG = {
     title: "Slowbeam.dev",
     description: "천천히, 그러나 정확하게",
     descriptions: {
-      ko: "산업용 카메라, 이미지 센서, 머신비전과 엣지 AI 하드웨어를 실제 설계·문제 해결 경험으로 정리합니다.",
-      en: "Field notes and practical guides on industrial cameras, image sensors, embedded vision, and edge AI hardware.",
+      ko: "전자공학, 하드웨어, 임베디드 시스템, 머신비전과 소프트웨어를 실제 설계·문제 해결 경험으로 정리합니다.",
+      en: "Practical engineering notes on electronics, hardware, embedded systems, machine vision, and software.",
     },
     scheme: "system", // 'light' | 'dark' | 'system'
   },

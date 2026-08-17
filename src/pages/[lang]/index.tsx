@@ -65,8 +65,8 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({
   const meta = {
     title:
       routeLanguage === "ko"
-        ? `${CONFIG.blog.title} | 머신비전·임베디드 비전 엔지니어링`
-        : `${CONFIG.blog.title} | Machine Vision & Embedded Vision Engineering`,
+        ? `${CONFIG.blog.title} | 전기·전자 엔지니어링 기술 블로그`
+        : `${CONFIG.blog.title} | Electrical & Electronics Engineering`,
     description:
       routeLanguage === "ko"
         ? CONFIG.blog.descriptions.ko

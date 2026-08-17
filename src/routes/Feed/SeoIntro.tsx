@@ -11,13 +11,13 @@ const SeoIntro = () => {
     <StyledSection>
       <h1>
         {isKorean
-          ? "머신비전·임베디드 비전 엔지니어링"
-          : "Machine Vision & Embedded Vision Engineering"}
+          ? "전기·전자 엔지니어링과 기술 이야기"
+          : "Electrical & Electronics Engineering"}
       </h1>
       <p>
         {isKorean
-          ? "산업용 카메라, 이미지 센서와 엣지 AI 하드웨어를 실제 설계·문제 해결 경험으로 정리합니다."
-          : "Practical engineering notes on industrial cameras, image sensors, embedded vision, and edge AI hardware."}
+          ? "전자공학, 하드웨어, 임베디드 시스템, 머신비전과 소프트웨어를 실제 설계·문제 해결 경험으로 정리합니다."
+          : "Practical engineering notes on electronics, hardware, embedded systems, machine vision, and software."}
       </p>
       <nav
         aria-label={isKorean ? "주요 기술 주제" : "Featured engineering topics"}
