@@ -1,26 +1,17 @@
 import styled from "@emotion/styled"
 import Link from "next/link"
 import useLanguage from "src/hooks/useLanguage"
-import { buildPostPath } from "src/libs/utils/paths"
+import { buildLanguageSegment } from "src/libs/utils/paths"
 
 const NavBar: React.FC = () => {
   const [language] = useLanguage()
-  const links = [{ id: 1, name: "About", slug: "about", category: "about" }]
+  const aboutPath = `/${buildLanguageSegment(language)}/about`
   return (
     <StyledWrapper className="">
       <ul>
-        {links.map((link) => (
-          <li key={link.id}>
-            <Link
-              href={buildPostPath(
-                { slug: link.slug, category: [link.category] },
-                language
-              )}
-            >
-              {link.name}
-            </Link>
-          </li>
-        ))}
+        <li>
+          <Link href={aboutPath}>About</Link>
+        </li>
       </ul>
     </StyledWrapper>
   )
