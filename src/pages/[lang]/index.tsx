@@ -65,12 +65,12 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({
   const meta = {
     title:
       routeLanguage === "ko"
-        ? `${CONFIG.blog.title} | 전기·전자 엔지니어링 기술 블로그`
-        : `${CONFIG.blog.title} | Electrical & Electronics Engineering`,
+        ? "머신비전·임베디드 비전 기술 | Slowbeam.dev"
+        : "Machine Vision & Embedded Vision | Slowbeam.dev",
     description:
       routeLanguage === "ko"
-        ? CONFIG.blog.descriptions.ko
-        : CONFIG.blog.descriptions.en,
+        ? "산업용 카메라·이미지 센서·SWIR/NIR·임베디드 비전·엣지 AI의 선택과 구축, 문제 해결을 다루는 실무 엔지니어링 노트."
+        : "Practical engineering guides to industrial cameras, image sensors, SWIR/NIR, embedded vision and edge AI, covering selection, integration and troubleshooting.",
     pageKind: "website" as const,
     url: getCanonicalUrl(path, CONFIG.link),
     canonical: path,
