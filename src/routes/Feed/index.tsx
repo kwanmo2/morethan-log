@@ -9,6 +9,7 @@ import MobileProfileCard from "./MobileProfileCard"
 import ProfileCard from "./ProfileCard"
 import ServiceCard from "./ServiceCard"
 import ContactCard from "./ContactCard"
+import TagCloudCard from "./TagCloudCard"
 import PostList from "./PostList"
 import PinnedPosts from "./PostList/PinnedPosts"
 import SeoIntro from "./SeoIntro"
@@ -22,14 +23,6 @@ const Feed: React.FC<Props> = () => {
 
   return (
     <StyledWrapper>
-      <div
-        className="lt"
-        css={{
-          height: `calc(100vh - ${HEADER_HEIGHT}px)`,
-        }}
-      >
-        <TagList />
-      </div>
       <div className="mid">
         <SeoIntro />
         <MobileProfileCard />
@@ -53,6 +46,7 @@ const Feed: React.FC<Props> = () => {
         <ProfileCard />
         <ServiceCard />
         <ContactCard />
+        <TagCloudCard />
         <div className="footer">
           <Footer />
         </div>
@@ -75,29 +69,11 @@ const StyledWrapper = styled.div`
     padding: 0.5rem 0;
   }
 
-  > .lt {
-    display: none;
-    overflow: scroll;
-    position: sticky;
-    grid-column: span 2 / span 2;
-    top: ${HEADER_HEIGHT - 10}px;
-
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    @media (min-width: 1024px) {
-      display: block;
-    }
-  }
-
   > .mid {
     grid-column: span 12 / span 12;
 
     @media (min-width: 1024px) {
-      grid-column: span 7 / span 7;
+      grid-column: span 9 / span 9;
     }
 
     > .tags {
