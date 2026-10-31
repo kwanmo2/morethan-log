@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ExtendedRecordMap } from "notion-types"
 import { NotionRenderer as ReactNotionRenderer } from "react-notion-x"
 import useScheme from "src/hooks/useScheme"
+import { pretendard } from "src/assets"
 
 // core styles shared by all of react-notion-x (required)
 import "react-notion-x/src/styles.css"
@@ -80,6 +81,21 @@ const NotionRenderer: FC<Props> = ({ recordMap }) => {
 export default NotionRenderer
 
 const StyledWrapper = styled.div`
+  /* Use Pretendard for both Korean and Latin glyphs instead of react-notion-x's system font stack */
+  .notion {
+    --notion-font: ${pretendard.style.fontFamily}, -apple-system,
+      BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: var(--notion-font);
+    font-size: 1rem;
+    line-height: 1.7;
+    letter-spacing: -0.01em;
+    word-break: keep-all;
+  }
+  .notion-h,
+  .notion-title {
+    font-family: var(--notion-font);
+  }
+
   /* // TODO: why render? */
   .notion-collection-page-properties {
     display: none !important;
